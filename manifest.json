@@ -1,0 +1,18 @@
+{
+  "name": "Servis360 Şoför - Canlı GPS Takip",
+  "short_name": "Şoför360",
+  "start_url": "/driver.html",
+  "display": "standalone",
+  "background_color": "#080c14",
+  "theme_color": "#0ea5e9",
+  "orientation": "portrait",
+  "description": "Servis360 Şoför Canlı Konum ve Otomatik Geofence Bildirim Uygulaması",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230284c7'/><text x='50%' y='65%' font-size='55' text-anchor='middle' fill='white'>🚐</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

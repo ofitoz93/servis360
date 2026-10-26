@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Servis360 Pro - Personel & Öğrenci Servis Takip Platformu</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS (Ücretsiz Açık Kaynak Harita) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <link rel="stylesheet" href="style.css?v=4.2">
+</head>
+<body>
+  <div class="ambient-glow"></div>
+
+  <!-- =========================================================================
+       1. GİRİŞ EKRANI (AÇILIŞTA İLK ÇIKAN EKRAN)
+       ========================================================================= -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-logo-icon">🚐</div>
+        <h1>Servis360 Pro</h1>
+        <p>Personel & Öğrenci Servis Portalı</p>
+      </div>
+
+      <form id="mainLoginForm" onsubmit="handleLoginSubmit(event)">
+        <div class="form-group">
+          <label for="inputEmail">E-posta Adresi</label>
+          <input type="email" id="inputEmail" class="form-control" placeholder="E-posta adresinizi giriniz" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="inputPassword">Şifre</label>
+          <input type="password" id="inputPassword" class="form-control" placeholder="Şifrenizi giriniz" required autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="btn-primary" id="btnLoginSubmit" style="margin-top: 1.5rem;">
+          <span>Giriş Yap</span>
+          <span>➔</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       2. DASHBOARD EKRANI (SOL MENÜ + İÇERİK ALANI)
+       ========================================================================= -->
+  <div class="dashboard-screen" id="dashboardScreen">
+    
+    <!-- SOL MENÜ (SIDEBAR) -->
+    <aside class="sidebar">
+      
+      <!-- Marka -->
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">🚐</div>
+        <div class="sidebar-brand-text">
+          <h2>Servis360</h2>
+          <span id="sidebarOperationBadge">Personel & Okul</span>
+        </div>
+      </div>
+
+      <!-- SÜPER ADMİN MENÜSÜ -->
+      <div id="sidebarSuperAdminSection" style="display: none;">
+        <div class="sidebar-section-title">Sistem Yönetimi</div>
+        <div class="sidebar-menu">
+          <button class="sidebar-item active" id="btnNavAdminCustomers" onclick="navigateTo('adminCustomers')">
+            <span>🏢</span>
+            <span>Müşteri Yönetimi</span>
+          </button>
+          <button class="sidebar-item" id="btnNavAdminSync" onclick="navigateTo('adminSync')">
+            <span>🔄</span>
+            <span>1. İK & ERP Senkronizasyonu</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- MÜŞTERİ (FİRMA / OKUL) MENÜSÜ -->
+      <div id="sidebarCompanySection" style="display: none;">
+        <div class="sidebar-section-title" id="sidebarCompanySectionTitle">Firma İşlemleri</div>
+        <div class="sidebar-menu">
+          <!-- 1. Menü: Fabrika VEYA Okul Lokasyonu -->
+          <button class="sidebar-item" id="btnNavCompanyWorkplace" onclick="navigateTo('companyWorkplace')">
+            <span id="navIconWorkplace">📍</span>
+            <span id="navTextWorkplace">Fabrika / Lokasyon Ayarları</span>
+          </button>
+          
+          <!-- 2. Menü: Servis Araçları -->
+          <button class="sidebar-item" id="btnNavCompanyShuttles" onclick="navigateTo('companyShuttles')">
+            <span>🚐</span>
+            <span>Servis Araçları</span>
+            <span class="badge" id="badgeShuttleCount">0</span>
+          </button>
+
+          <!-- 3. Menü: Rota & Durak Belirleme -->
+          <button class="sidebar-item" id="btnNavCompanyRoutes" onclick="navigateTo('companyRoutes')">
+            <span>🗺️</span>
+            <span>Rota & Durak Belirleme</span>
+          </button>
+
+          <!-- 4. Menü: Personel VEYA Öğrenci/Veli Yönetimi -->
+          <button class="sidebar-item" id="btnNavCompanyEmployees" onclick="navigateTo('companyEmployees')">
+            <span id="navIconPassengers">👥</span>
+            <span id="navTextPassengers">Personel Yönetimi</span>
+            <span class="badge" id="badgeEmployeeCount">0</span>
+          </button>
+
+          <!-- 5. Menü: Canlı Takip -->
+          <button class="sidebar-item" id="btnNavCompanyLiveMap" onclick="navigateTo('companyLiveMap')">
+            <span>📡</span>
+            <span>Canlı Servis Takip</span>
+          </button>
+
+          <!-- 6. Menü: Şartlı Entegrasyon -->
+          <button class="sidebar-item" id="btnNavCompanyIntegration" style="display: none;" onclick="navigateTo('companyIntegration')">
+            <span>🔌</span>
+            <span>Entegrasyon & API</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Alt Kullanıcı Bilgisi ve Çıkış -->
+      <div class="sidebar-footer">
+        <div class="user-card">
+          <div class="user-card-avatar" id="sidebarAvatar">SA</div>
+          <div style="overflow: hidden;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #fff; white-space: nowrap; text-overflow: ellipsis;" id="sidebarUserName">Yönetici</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);" id="sidebarUserRole">Süper Admin</div>
+          </div>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()">
+          <span>🚪</span>
+          <span>Çıkış Yap</span>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- ANA İÇERİK ALANI -->
+    <div class="main-wrapper">
+      
+      <!-- Üst Çubuk (Topbar) -->
+      <header class="topbar">
+        <div class="topbar-title">
+          <h2 id="pageMainHeading">Müşteri Yönetimi</h2>
+          <p id="pageSubHeading">Kayıtlı kurumsal müşteriler ve hesap tanımlama</p>
+        </div>
+        <div class="topbar-meta">
+          <span class="badge-tag badge-portal" id="topbarCompanyBadge" style="display: none;">TechNova Holding</span>
+          <span class="badge-tag badge-success" id="topbarOperationTag">🏢 Personel Modu</span>
+          <span class="badge-tag badge-success">🛣️ OSRM Gerçek Yol Motoru</span>
+        </div>
+      </header>
+
+      <!-- Sayfa Gövdeleri (Dinamik Sekmeler) -->
+      <main class="content-body">
+        
+        <!-- =================================================================
+             VIEW A1: SÜPER ADMİN - MÜŞTERİ YÖNETİMİ
+             ================================================================= -->
+        <section class="view-section" id="viewAdminCustomers">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff;">Müşteri Hesapları</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Personel veya Öğrenci servisi hizmeti alan firmaları tanımlayın.</p>
+            </div>
+            <button class="btn-action success" onclick="openModal('modalCreateCompany')">
+              <span>➕ Yeni Müşteri Oluştur</span>
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>Kayıtlı Müşteri Şirketleri / Okulları</span>
+              <span id="txtCustomerTotal" style="font-size: 0.8rem; color: var(--accent-cyan);">0 Kayıt</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Firma / Okul Adı</th>
+                    <th>Faaliyet Türü</th>
+                    <th>Yetkili İletişim</th>
+                    <th>Lisans Tipi</th>
+                    <th>Hedef Varış Noktası</th>
+                    <th>Filo & Yolcu</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyAdminCustomers">
+                  <!-- JS ile doldurulacak -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             VIEW A2: SÜPER ADMİN - 1. İK & ERP SENKRONİZASYONU
+             ================================================================= -->
+        <section class="view-section" id="viewAdminSync">
+          <div class="card">
+            <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">
+              1. İK & ERP Personel / Öğrenci Senkronizasyonu
+            </h3>
+            <p style="font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1.5rem;">
+              Kurumsal firmaların (SAP, Workday, Logo) veya Okul Yönetim Sistemlerinin (e-Okul, K12NET vb.) servis yolcu ve durak verilerini otomatik eşleştirebileceği REST API & Webhook motoru.
+            </p>
+
+            <div class="card-title">Örnek Senkronizasyon İsteği (Personel / Öğrenci)</div>
+            <pre style="background: #080c14; padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.08); font-family: 'Fira Code', monospace; font-size: 0.85rem; color: #38bdf8; overflow-x: auto;"><code>// POST /api/v1/personnel/sync
+// Header: Authorization: Bearer {musteri_ozel_api_anahtari}
+{
+  "sync_action": "upsert_batch",
+  "passengers": [
+    {
+      "passenger_type": "student", // veya "employee"
+      "full_name": "Ali Kerem Kaya",
+      "student_class": "6-B",
+      "parent_name": "Murat Kaya",
+      "parent_phone": "+905321112233",
+      "home_pickup_address": "Kadıköy Rıhtım No:12 İstanbul",
+      "shift_group": "Sabah-08:15"
+    }
+  ]
+}</code></pre>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             VIEW C1: MÜŞTERİ - FABRİKA VEYA OKUL LOKASYON AYARLARI
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyWorkplace">
+          <div class="card">
+            <div class="card-title">
+              <span id="titleWorkplaceCard">Hedef Lokasyon Belirleme</span>
+              <span class="badge-tag badge-portal">📍 Haritadan Konum Seçimi Aktif</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;" id="descWorkplaceCard">
+              Hedef varış noktanızı haritada <b>tıklayarak</b> veya pini sürükleyerek işaretleyin. Servis bu çite girdiğinde canlı konum otomatik durdurulur.
+            </p>
+
+            <div class="map-picker-wrapper">
+              <!-- Sol: Form Alanı -->
+              <form onsubmit="handleSaveWorkplace(event)">
+                <div class="form-group">
+                  <label id="labelWorkplaceName">Fabrika / Okul Adı</label>
+                  <input type="text" id="wpInputName" class="form-control" required placeholder="Örn: Maslak Kampüs">
+                </div>
+
+                <div class="form-group">
+                  <label>Enlem (Latitude)</label>
+                  <input type="number" step="any" id="wpInputLat" class="form-control" required placeholder="41.1105">
+                </div>
+
+                <div class="form-group">
+                  <label>Boylam (Longitude)</label>
+                  <input type="number" step="any" id="wpInputLng" class="form-control" required placeholder="29.0225">
+                </div>
+
+                <div class="form-group">
+                  <label>Otomatik Durdurma Çiti (Geofence Yarıçapı - Metre)</label>
+                  <input type="number" id="wpInputGeofence" class="form-control" required value="180" oninput="updateWorkplaceGeofenceRadius(this.value)">
+                  <span style="font-size: 0.725rem; color: var(--accent-amber); display: block; margin-top: 0.35rem;">
+                    ⚡ Araç bu çite girince GPS yayını otomatik kapatılır.
+                  </span>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
+                  <button type="button" class="btn-action secondary" onclick="getBrowserCurrentLocation()">
+                    <span>📍 Konumumu Al</span>
+                  </button>
+                  <button type="submit" class="btn-action success" style="flex: 1; justify-content: center;">
+                    <span>💾 Lokasyonu Kaydet</span>
+                  </button>
+                </div>
+              </form>
+
+              <!-- Sağ: İnteraktif Harita Seçici -->
+              <div class="picker-map" style="position: relative;">
+                <div class="map-instruction-overlay">
+                  <span id="instructionWorkplaceMap">📍 Haritaya tıklayarak veya pini sürükleyerek hedefi belirleyin</span>
+                </div>
+                <div id="workplacePickerMap"></div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- =================================================================
+             VIEW C2: MÜŞTERİ - SERVİS YÖNETİMİ
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyShuttles">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff;">Servis Araçları</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Servis araçlarınızı, koltuk kapasitelerini ve şoförlerinizi yönetin.</p>
+            </div>
+            <button class="btn-action success" onclick="openModal('modalCreateShuttle')">
+              <span>➕ Yeni Servis Ekle</span>
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>Kayıtlı Servis Filosu</span>
+              <span id="txtCompanyShuttleTotal" style="font-size: 0.8rem; color: var(--accent-cyan);">0 Araç</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Plaka</th>
+                    <th>Model</th>
+                    <th>Kapasite</th>
+                    <th>Şoför Adı</th>
+                    <th>Şoför Telefonu</th>
+                    <th>İşe Başlama Saati</th>
+                    <th>Canlı Durum</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyCompanyShuttles">
+                  <!-- JS ile doldurulacak -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             VIEW C3: MÜŞTERİ - YOLLAR ÜZERİNDEN GERÇEK ROTA & DURAK BELİRLEME (OSRM)
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyRoutes">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff;">Yollar Üzerinden Rota & Durak Planlama</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                Haritaya tıklayarak durakları belirleyin; sistem <b>gerçek yollardan (otoyol/cadde)</b> en uygun rotayı ve mesafeyi otomatik hesaplar.
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="map-picker-wrapper">
+              
+              <!-- Sol Kontrol Alanı -->
+              <div>
+                <div class="form-group">
+                  <label>1. Servis Aracını Seçin</label>
+                  <select id="routeBuilderShuttleSelect" class="form-control" required>
+                    <!-- JS ile doldurulacak -->
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>2. Rota / Güzergah Adı</label>
+                  <input type="text" id="routeBuilderNameInput" class="form-control" placeholder="Örn: Kadıköy - Okul Sabah Hattı" value="Sabah Servis Güzergahı">
+                </div>
+
+                <!-- Yol Geometrisi Özet Bilgisi -->
+                <div id="routeCalculationSummaryBox" style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 0.75rem; display: none;">
+                  <div style="font-size: 0.75rem; color: #34d399; font-weight: 700;">🛣️ OSRM Yol Hesabı:</div>
+                  <div style="font-size: 0.825rem; color: #fff; margin-top: 0.2rem;" id="routeCalcStats">-- km, ~-- dakika</div>
+                </div>
+
+                <div style="margin-top: 0.5rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1;">Haritadan Eklenen Duraklar</label>
+                    <button type="button" class="btn-action secondary" style="padding: 0.2rem 0.6rem; font-size: 0.725rem;" onclick="clearRouteBuilderStops()">
+                      🧹 Temizle
+                    </button>
+                  </div>
+                  
+                  <div class="stops-builder-list" id="routeBuilderStopsContainer">
+                    <div style="color: var(--text-dim); font-size: 0.775rem; text-align: center; padding: 1.5rem 0;">
+                      Henüz durak eklenmedi.<br>Yandaki haritaya tıklayarak durak ekleyin.
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" class="btn-action success" style="width: 100%; justify-content: center; margin-top: 1.25rem;" onclick="saveRouteFromBuilder()">
+                  <span>💾 Gerçek Yol Rotasını Kaydet</span>
+                </button>
+              </div>
+
+              <!-- Sağ: İnteraktif Yol Haritası -->
+              <div class="picker-map" style="position: relative;">
+                <div class="map-instruction-overlay">
+                  <span>🛣️ Haritaya tıklayarak durakları ekleyin, sistem gerçek yollar üzerinden rotayı çizer</span>
+                </div>
+                <div id="routeBuilderMap"></div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Kayıtlı Rotalar Listesi -->
+          <div class="card">
+            <div class="card-title">Kayıtlı Güzergahlar ve Yol Mesafeleri</div>
+            <div id="companySavedRoutesList">
+              <!-- JS ile mevcut rotalar listelenecek -->
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             VIEW C4: MÜŞTERİ - PERSONEL VEYA ÖĞRENCİ & VELİ YÖNETİMİ
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyEmployees">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff;" id="titlePassengerPage">Personel Yönetimi</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);" id="descPassengerPage">
+                Yolcularınızı ekleyin, servislere ve biniş duraklarına atayın.
+              </p>
+            </div>
+            <button class="btn-action success" onclick="openModal('modalCreateEmployee')">
+              <span id="btnTextAddPassenger">➕ Yeni Personel Ekle</span>
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span id="titlePassengerTable">Yolcu Listesi ve Servis Atamaları</span>
+              <span id="txtCompanyEmployeeTotal" style="font-size: 0.8rem; color: var(--accent-cyan);">0 Kayıt</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr id="theadPassengerCols">
+                    <!-- Dinamik kolonlar (Personel vs Öğrenci/Veli) -->
+                  </tr>
+                </thead>
+                <tbody id="tbodyCompanyEmployees">
+                  <!-- JS ile doldurulacak -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             VIEW C5: MÜŞTERİ - CANLI SERVİS TAKİP (GERÇEK YOLDA HAREKET)
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyLiveMap">
+          
+          <div id="liveMapEmptyState" class="empty-state-box" style="display: none;">
+            <div class="empty-state-icon">⚠️</div>
+            <h4>Henüz Tanımlı Bir Servis Rotası Bulunmuyor</h4>
+            <p>
+              Canlı takip yapabilmek için lütfen önce 'Rota & Durak Belirleme' alanından harita üzerinden durakları ekleyip rotayı kaydedin.
+            </p>
+            <button class="btn-action success" onclick="navigateTo('companyRoutes')">
+              <span>🗺️ Harita Üzerinden Rota Belirle</span>
+            </button>
+          </div>
+
+          <div id="liveMapActiveContainer" style="display: none;">
+            <div class="card" style="padding: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <span id="liveMapCompanyHeader" style="font-size: 1rem; font-weight: 700; color: #fff;">Canlı Servis Takip</span>
+                    <span class="badge-tag badge-success" id="liveMapStatusBadge">Canlı GPS Akışı Aktif</span>
+                  </div>
+                  <div id="liveMapRouteMeta" style="font-size: 0.775rem; color: #34d399; margin-top: 0.25rem;">
+                    🛣️ Rota detayları yükleniyor...
+                  </div>
+                </div>
+
+                <!-- Güzergah / Rota Seçici Dropdown -->
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">İzlenecek Rota:</label>
+                  <select id="liveMapRouteSelect" class="form-control" style="width: auto; min-width: 220px; padding: 0.35rem 0.75rem; font-size: 0.825rem;" onchange="onLiveMapRouteChange(this.value)">
+                    <!-- JS ile doldurulacak -->
+                  </select>
+                </div>
+              </div>
+              
+              <div class="map-container">
+                <div id="leafletMap"></div>
+              </div>
+
+              <!-- Test / Canlı Simülasyon Kontrolleri -->
+              <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
+                <button class="btn-action success" onclick="simulateMethodBAutoStart()" title="Vardiya/Okul saati gelince şoför dokunmasa da canlı konumu başlatır">
+                  <span>⏰ 07:15 Otomatik Başlat</span>
+                </button>
+                <button class="btn-action primary" id="btnToggleAutoDrive" onclick="toggleAutoDrive()" style="background: var(--accent-blue); color: #fff;" title="Aracı gerçek yollar boyunca otomatik sürüşe geçirir">
+                  <span id="txtToggleAutoDrive">▶️ Canlı Sürüşü Başlat</span>
+                </button>
+                <button class="btn-action secondary" onclick="stepShuttleProgress()" title="Manuel olarak birkaç adım ilerletir">
+                  <span>⏩ Manuel Adım İlerlet</span>
+                </button>
+                <button class="btn-action secondary" onclick="simulateArrivalGeofence()" title="Aracı doğrudan fabrikanın/okulun kapısındaki sanal çite sokar">
+                  <span>🏁 Varış Noktasına Ulaştı (Geofence Kapat)</span>
+                </button>
+                <button class="btn-action secondary" onclick="resetLiveSimulation()" style="font-size:0.75rem; padding: 0.35rem 0.65rem;" title="Simülasyonu başlangıç noktasına sıfırlar">
+                  <span>🔄 Başa Sar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- =================================================================
+             VIEW C6: MÜŞTERİ - ENTEGRASYON & API (SADECE ENTEGRASYONLU LİSANSA ÖZEL)
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyIntegration">
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff;">Kurumsal Entegrasyon Portalı (API & Webhook)</h3>
+              <span class="badge-tag badge-integration">Entegrasyon Lisansı Aktif</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1.5rem;">
+              Firmanızın veya okulunuzun kendi sistemlerine canlı servis verilerini çekmek için API ve Webhook entegrasyonu.
+            </p>
+
+            <div class="form-group" style="max-width: 500px;">
+              <label>Kurumsal API Anahtarınız (Bearer Token)</label>
+              <input type="text" class="form-control" readonly value="s360_live_sec_9941a8fd204bf1e7">
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+  </div>
+
+  <!-- =========================================================================
+       MODALLER
+       ========================================================================= -->
+
+  <!-- MODAL: YENİ MÜŞTERİ FİRMA / OKUL OLUŞTUR (SÜPER ADMİN) -->
+  <div class="modal-overlay" id="modalCreateCompany">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color:#fff; font-size:1.15rem; font-weight:700;">➕ Yeni Müşteri Tanımla</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalCreateCompany')">&times;</button>
+      </div>
+
+      <form onsubmit="handleCreateCompanySubmit(event)">
+        
+        <!-- FAALİYET TÜRÜ SEÇİMİ (PERSONEL vs ÖĞRENCİ SERVİSİ) -->
+        <div class="form-group" style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); padding: 0.85rem; border-radius: var(--radius-sm);">
+          <label style="color: #34d399; font-weight: 700;">1. Faaliyet Türü (Sektör)</label>
+          <select id="compInputOperationType" class="form-control" required style="margin-top: 0.35rem;" onchange="onOperationTypeChange(this.value)">
+            <option value="personnel">🏢 Personel Servisi (Fabrika, Şirket, Plaza)</option>
+            <option value="school">🎓 Öğrenci Servisi (Okul, Kolej, Üniversite, Etüt)</option>
+          </select>
+          <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-top: 0.35rem;">
+            * 'Öğrenci Servisi' seçilirse panelde veli tanımlama, öğrenci sınıf/numara ve okul lokasyonu özellikleri aktif olur.
+          </span>
+        </div>
+
+        <!-- HİZMET LİSANS TÜRÜ (BİZİM SİTE vs ENTEGRASYON) -->
+        <div class="form-group" style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); padding: 0.85rem; border-radius: var(--radius-sm);">
+          <label style="color: #60a5fa; font-weight: 700;">2. Hizmet Türü (Lisans Tipi)</label>
+          <select id="compInputServiceType" class="form-control" required style="margin-top: 0.35rem;">
+            <option value="portal">Bizim Sitemizden Takip (Web Portalı Kullanır)</option>
+            <option value="integration">Kendi Sistemlerine Entegrasyonlu (API Sayfası Açık)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="labelNewCompanyName">Firma / Okul Adı</label>
+          <input type="text" id="compInputName" class="form-control" placeholder="Örn: Doğa Koleji veya Borusan Boru" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Yetkili Adı Soyadı</label>
+            <input type="text" id="compInputPerson" class="form-control" placeholder="Örn: Kerem Kaya" required>
+          </div>
+          <div class="form-group">
+            <label>Yetkili E-posta (Giriş için)</label>
+            <input type="email" id="compInputEmail" class="form-control" placeholder="yetkili@kurum.com" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Giriş Şifresi</label>
+            <input type="password" id="compInputPassword" class="form-control" value="123456" required>
+          </div>
+          <div class="form-group">
+            <label>Telefon</label>
+            <input type="text" id="compInputPhone" class="form-control" placeholder="0212 555 00 00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label id="labelNewCompanyWorkplace">Hedef Kampüs / Tesis Adı</label>
+          <input type="text" id="compInputWorkplace" class="form-control" value="Merkez Kampüs" required>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; gap:0.5rem; margin-top:1.5rem;">
+          <button type="button" class="btn-action secondary" onclick="closeModal('modalCreateCompany')">Vazgeç</button>
+          <button type="submit" class="btn-action success">Müşteriyi Oluştur & Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: YENİ SERVİS EKLE (MÜŞTERİ) -->
+  <div class="modal-overlay" id="modalCreateShuttle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color:#fff; font-size:1.15rem; font-weight:700;">🚐 Yeni Servis Tanımla</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalCreateShuttle')">&times;</button>
+      </div>
+
+      <form onsubmit="handleCreateShuttleSubmit(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Servis Plakası</label>
+            <input type="text" id="shuttleInputPlate" class="form-control" placeholder="34 DEF 456" required>
+          </div>
+          <div class="form-group">
+            <label>Koltuk Kapasitesi</label>
+            <input type="number" id="shuttleInputCapacity" class="form-control" value="24" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Araç Modeli</label>
+          <input type="text" id="shuttleInputModel" class="form-control" value="Mercedes-Benz Sprinter">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Şoför Adı Soyadı</label>
+            <input type="text" id="shuttleInputDriverName" class="form-control" placeholder="Ali Can" required>
+          </div>
+          <div class="form-group">
+            <label>Şoför Telefonu</label>
+            <input type="text" id="shuttleInputDriverPhone" class="form-control" placeholder="0532 000 00 00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>İşe / Okula Başlama Saati</label>
+          <input type="time" id="shuttleInputShiftTime" class="form-control" value="07:15" required>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; gap:0.5rem; margin-top:1.5rem;">
+          <button type="button" class="btn-action secondary" onclick="closeModal('modalCreateShuttle')">Vazgeç</button>
+          <button type="submit" class="btn-action success">Servisi Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PERSONEL VEYA ÖĞRENCİ & VELİ EKLE (DİNAMİK FORM) -->
+  <div class="modal-overlay" id="modalCreateEmployee">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 style="color:#fff; font-size:1.15rem; font-weight:700;" id="modalTitleAddPassenger">👤 Yeni Personel Ekle</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalCreateEmployee')">&times;</button>
+      </div>
+
+      <form onsubmit="handleCreateEmployeeSubmit(event)">
+        
+        <!-- 1. Kişi Bilgisi (Öğrenci veya Personel) -->
+        <div class="form-group">
+          <label id="labelPassengerFullName">Adı Soyadı</label>
+          <input type="text" id="empInputFullName" class="form-control" placeholder="Adı Soyadı" required>
+        </div>
+
+        <!-- Personel Özel Alanı (Departman & Kendi Telefonu) -->
+        <div id="formSectionPersonnel">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Departman</label>
+              <input type="text" id="empInputDept" class="form-control" value="Üretim / Montaj">
+            </div>
+            <div class="form-group">
+              <label>Personel Telefonu</label>
+              <input type="text" id="empInputPhone" class="form-control" placeholder="0530 000 00 00">
+            </div>
+          </div>
+        </div>
+
+        <!-- Öğrenci & Veli Özel Alanları -->
+        <div id="formSectionStudent" style="display: none; background: rgba(59,130,246,0.08); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(59,130,246,0.25); margin-bottom: 1rem;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.75rem;">🎓 Öğrenci ve Veli Bilgileri:</div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Sınıf / Şube</label>
+              <input type="text" id="studentInputClass" class="form-control" placeholder="Örn: 8-A veya 3-C">
+            </div>
+            <div class="form-group">
+              <label>Öğrenci Okul No</label>
+              <input type="text" id="studentInputNumber" class="form-control" placeholder="Örn: 412">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Veli Adı Soyadı</label>
+              <input type="text" id="parentInputName" class="form-control" placeholder="Örn: Mehmet Demir">
+            </div>
+            <div class="form-group">
+              <label>Veli Telefonu (SMS/Bildirim için)</label>
+              <input type="text" id="parentInputPhone" class="form-control" placeholder="0532 555 12 34">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Yakınlık Derecesi</label>
+            <select id="parentInputRelation" class="form-control">
+              <option value="Anne">Anne</option>
+              <option value="Baba" selected>Baba</option>
+              <option value="Veli">Yasal Veli / Vasi</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Atanacağı Servis (Katı İzolasyon)</label>
+          <select id="empInputShuttleSelect" class="form-control">
+            <!-- JS ile doldurulacak -->
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; gap:0.5rem; margin-top:1.5rem;">
+          <button type="button" class="btn-action secondary" onclick="closeModal('modalCreateEmployee')">Vazgeç</button>
+          <button type="submit" class="btn-action success" id="btnSubmitPassengerModal">Kaydet & Servise Ata</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Bildirim Kutusu -->
+  <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <script src="app.js?v=4.2"></script>
+</body>
+</html>
