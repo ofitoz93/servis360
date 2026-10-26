@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Servis360 Şoför - Canlı GPS Akışı</title>
+  <title>Servis360 Şoför - Canlı GPS Kokpiti & Yolcu Listesi</title>
   
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="manifest.json">
@@ -23,7 +23,7 @@
   <style>
     :root {
       --bg-dark: #080c14;
-      --card-bg: rgba(15, 23, 42, 0.85);
+      --card-bg: rgba(15, 23, 42, 0.9);
       --border-color: rgba(255, 255, 255, 0.08);
       --accent-blue: #3b82f6;
       --accent-cyan: #06b6d4;
@@ -49,10 +49,9 @@
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
-      padding-bottom: env(safe-area-inset-bottom, 20px);
+      padding-bottom: env(safe-area-inset-bottom, 24px);
     }
 
-    /* Ambient background glow */
     .ambient-glow {
       position: fixed;
       top: 0;
@@ -70,10 +69,10 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(8, 12, 20, 0.9);
+      background: rgba(8, 12, 20, 0.95);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-color);
-      padding: 1rem 1.25rem;
+      padding: 0.9rem 1.25rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -86,8 +85,8 @@
     }
 
     .brand-icon {
-      width: 40px;
-      height: 40px;
+      width: 38px;
+      height: 38px;
       border-radius: 10px;
       background: linear-gradient(135deg, #0284c7, #2563eb);
       display: flex;
@@ -98,17 +97,15 @@
     }
 
     .brand-title h1 {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 800;
-      background: linear-gradient(to right, #fff, #93c5fd);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: #fff;
     }
 
     .brand-title span {
-      font-size: 0.7rem;
+      font-size: 0.675rem;
       color: var(--accent-cyan);
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -124,7 +121,6 @@
       background: rgba(148, 163, 184, 0.12);
       color: var(--text-muted);
       border: 1px solid rgba(148, 163, 184, 0.2);
-      transition: all 0.3s ease;
     }
 
     .status-pill.active {
@@ -146,21 +142,19 @@
       50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
     }
 
-    /* Container */
     .container {
       position: relative;
       z-index: 1;
       padding: 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
-      max-width: 500px;
+      gap: 1rem;
+      max-width: 520px;
       margin: 0 auto;
       width: 100%;
       flex: 1;
     }
 
-    /* Card */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -169,13 +163,12 @@
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
     }
 
-    /* Shuttle Selector Form */
     .form-group label {
       display: block;
-      font-size: 0.8rem;
+      font-size: 0.775rem;
       font-weight: 700;
       color: var(--text-muted);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.45rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -198,38 +191,42 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
     }
 
-    /* Shuttle Info Box */
-    .shuttle-badge-card {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    /* Shift Cards */
+    .shift-times-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 12px;
-      padding: 1rem;
+      padding: 0.9rem;
       margin-top: 0.75rem;
     }
 
-    .shuttle-plate {
-      font-family: 'Fira Code', monospace;
-      font-size: 1.35rem;
-      font-weight: 800;
-      letter-spacing: 1px;
-      color: #fff;
+    .shift-col {
+      text-align: center;
     }
 
-    .shuttle-sub {
-      font-size: 0.8rem;
+    .shift-title {
+      font-size: 0.7rem;
       color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .shift-val {
+      font-family: 'Fira Code', monospace;
+      font-size: 1.25rem;
+      font-weight: 800;
       margin-top: 0.2rem;
     }
 
-    /* Metrics Grid */
+    /* Telemetry */
     .metrics-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
-      margin-top: 0.5rem;
+      margin-top: 0.75rem;
     }
 
     .metric-card {
@@ -248,27 +245,26 @@
     }
 
     .metric-label {
-      font-size: 0.725rem;
+      font-size: 0.7rem;
       color: var(--text-muted);
       margin-top: 0.25rem;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
 
-    /* The Big Action Button */
+    /* Buttons */
     .btn-action-gps {
       width: 100%;
       border: none;
       border-radius: 16px;
-      padding: 1.25rem;
-      font-size: 1.15rem;
+      padding: 1.2rem;
+      font-size: 1.1rem;
       font-weight: 800;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.75rem;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.25s ease;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
     }
 
@@ -290,16 +286,49 @@
       50% { transform: scale(1.02); }
     }
 
-    /* Map container */
     #driverMap {
       width: 100%;
-      height: 220px;
+      height: 200px;
       border-radius: 12px;
       border: 1px solid var(--border-color);
-      z-index: 1;
+      margin-top: 0.75rem;
     }
 
-    /* PWA Install Notice */
+    /* Passenger List */
+    .passenger-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 0.85rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      margin-bottom: 0.5rem;
+    }
+
+    .btn-board {
+      border: none;
+      border-radius: 8px;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-board.waiting {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-board.boarded {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    /* PWA Banner */
     .pwa-notice {
       background: rgba(14, 165, 233, 0.1);
       border: 1px solid rgba(14, 165, 233, 0.25);
@@ -312,7 +341,7 @@
       gap: 0.6rem;
     }
 
-    /* Arrival Modal */
+    /* Modal */
     .arrival-overlay {
       position: fixed;
       inset: 0;
@@ -333,24 +362,6 @@
       text-align: center;
       max-width: 400px;
       width: 100%;
-      box-shadow: 0 20px 40px rgba(16, 185, 129, 0.25);
-      animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    @keyframes popIn {
-      0% { transform: scale(0.85); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
-    .arrival-icon {
-      font-size: 3.5rem;
-      margin-bottom: 1rem;
-      animation: bounce 1s infinite alternate;
-    }
-
-    @keyframes bounce {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-8px); }
     }
   </style>
 </head>
@@ -363,81 +374,169 @@
       <div class="brand-icon">🚐</div>
       <div class="brand-title">
         <h1>Servis360</h1>
-        <span>Şoför Kokpiti</span>
+        <span id="txtHeaderRole">Şoför Kokpiti</span>
       </div>
     </div>
-    <div class="status-pill" id="badgeGpsStatus">
-      <span class="status-dot"></span>
-      <span id="txtGpsStatus">BEKLEMEDE</span>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <div class="status-pill" id="badgeGpsStatus">
+        <span class="status-dot"></span>
+        <span id="txtGpsStatus">BEKLEMEDE</span>
+      </div>
+      <button id="btnDriverLogout" onclick="handleDriverLogout()" style="display: none; background: rgba(244,63,94,0.15); color: #f43f5e; border: 1px solid rgba(244,63,94,0.3); border-radius: 8px; padding: 0.35rem 0.6rem; font-size: 0.725rem; font-weight: 700; cursor: pointer;">
+        Çıkış
+      </button>
     </div>
   </header>
 
-  <!-- Main Container -->
   <main class="container">
     
-    <!-- 1. Servis Aracı Seçimi -->
-    <div class="card">
-      <div class="form-group">
-        <label>Servis Aracınızı Seçin</label>
-        <select id="selectShuttle" class="form-control" onchange="onShuttleSelect(this.value)">
-          <option value="">Araçlar yükleniyor...</option>
-        </select>
+    <!-- =========================================================================
+         1. ŞOFÖR GİRİŞ EKRANI (LOGIN)
+         ========================================================================= -->
+    <div class="card" id="cardDriverLogin">
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🚐</div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #fff;">Şoför Girişi</h2>
+        <p style="font-size: 0.825rem; color: var(--text-muted); margin-top: 0.25rem;">
+          Aracınızın plakası veya kullanıcı adınız ile giriş yapın.
+        </p>
       </div>
 
-      <div class="shuttle-badge-card" id="shuttleDetailsCard" style="display: none;">
-        <div>
-          <div class="shuttle-plate" id="txtPlate">41 ABC 41</div>
-          <div class="shuttle-sub" id="txtCompany">Akin Tekstil Sanayi A.Ş.</div>
+      <form onsubmit="handleDriverLoginSubmit(event)">
+        <div class="form-group">
+          <label>Plaka, Personel ID veya Şoför Telefonu</label>
+          <input type="text" id="loginInputUsername" class="form-control" placeholder="Örn: 41 ABC 41, 41ABC41 veya PRS-1005" required autocomplete="username">
+          <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+            * Plakanız (41ABC41), Personel ID'niz (PRS-1005) veya telefonunuz ile girebilirsiniz.
+          </span>
         </div>
-        <div style="text-align: right;">
-          <div style="font-size: 0.8rem; font-weight: 700; color: #fff;" id="txtDriver">Ahmet T</div>
-          <div style="font-size: 0.725rem; color: var(--accent-amber);" id="txtShiftTime">Saat: 07:15</div>
+
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label>Şifre</label>
+          <input type="password" id="loginInputPassword" class="form-control" placeholder="Şifreniz (Varsayılan: 123456)" required autocomplete="current-password" value="123456">
+        </div>
+
+        <button type="submit" class="btn-action-gps start" style="margin-top: 1.25rem; font-size: 1rem; padding: 1rem;" id="btnLoginSubmit">
+          <span>Giriş Yap ve Kokpiti Aç</span>
+          <span>➔</span>
+        </button>
+      </form>
+
+      <!-- Hızlı Seçim Butonları -->
+      <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+        <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">HIZLI DENEME GİRİŞLERİ:</span>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn-board waiting" style="flex: 1;" onclick="quickLogin('41ABC41', '123456')">
+            41 ABC 41 (Plaka)
+          </button>
+          <button type="button" class="btn-board waiting" style="flex: 1;" onclick="quickLogin('PRS-1005', '123456')">
+            PRS-1005 (Personel ID)
+          </button>
+          <button type="button" class="btn-board waiting" style="flex: 1;" onclick="quickLogin('34OKL789', '123456')">
+            34 OKL 789 (Doğa Koleji)
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- 2. Canlı GPS ve Hız Göstergeleri -->
-    <div class="card" id="cardTelemetry" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hedef Tesis / Sanal Çit</span>
-        <span class="status-pill" style="font-size: 0.7rem; color: #60a5fa;" id="txtGeofenceRadius">180m Radar</span>
-      </div>
-      <div style="font-size: 0.95rem; font-weight: 700; color: #fff;" id="txtWorkplaceName">Merkez Fabrika</div>
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;" id="txtGeofenceNotice">
-        Hedef kapısına vardığınızda GPS yayını otomatik kapatılır.
+    <!-- =========================================================================
+         2. ŞOFÖR AKTİF SEFER KOKPİTİ (GİRİŞ YAPILINCA GÖRÜNÜR)
+         ========================================================================= -->
+    <div id="sectionDriverCockpit" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
+      
+      <!-- Servis ve Vardiya Saatleri Kartı -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-family: 'Fira Code', monospace; font-size: 1.4rem; font-weight: 800; color: #fff;" id="txtActivePlate">41 ABC 41</div>
+            <div style="font-size: 0.8rem; color: var(--accent-cyan); font-weight: 600;" id="txtActiveCompany">Akin Tekstil Sanayi A.Ş.</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #fff;" id="txtActiveDriver">Ahmet T</div>
+            <span class="status-pill" style="font-size:0.675rem; color:#60a5fa;" id="txtOpTypeBadge">Personel Servisi</span>
+          </div>
+        </div>
+
+        <!-- Başlama ve Dönüş Saatleri -->
+        <div class="shift-times-box">
+          <div class="shift-col" style="border-right: 1px solid rgba(255,255,255,0.06);">
+            <div class="shift-title">🌅 Sabah Başlama</div>
+            <div class="shift-val" style="color: var(--accent-amber);" id="txtShiftStart">07:15</div>
+          </div>
+          <div class="shift-col">
+            <div class="shift-title">🌇 Akşam Dönüş</div>
+            <div class="shift-val" style="color: #60a5fa;" id="txtShiftReturn">17:30</div>
+          </div>
+        </div>
+
+        <!-- Otomatik Bildirim & Başlatma Durumu -->
+        <div style="margin-top: 0.75rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 0.75rem; font-size: 0.775rem; color: #34d399; display: flex; justify-content: space-between; align-items: center;">
+          <span>⏰ İşe başlama saatinde (07:15) canlı GPS otomatik başlar.</span>
+          <button type="button" class="btn-board waiting" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="triggerSimulatedAutoStart()">
+            ⚡ Saati Simüle Et
+          </button>
+        </div>
       </div>
 
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-val" id="metricSpeed">0 <span style="font-size:0.75rem;">km/s</span></div>
-          <div class="metric-label">Anlık Hız</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-val" id="metricAccuracy">±-- <span style="font-size:0.75rem;">m</span></div>
-          <div class="metric-label">GPS Hassasiyeti</div>
-        </div>
+      <!-- Dev Canlı Konum Başlat / Durdur Butonu -->
+      <div>
+        <button class="btn-action-gps start" id="btnToggleGps" onclick="toggleDriverGps()">
+          <span>📡</span>
+          <span id="btnGpsText">CANLI KONUMU BAŞLAT</span>
+        </button>
       </div>
 
-      <!-- Harita -->
-      <div style="margin-top: 1rem;">
+      <!-- Telemetri ve Hedef Radar Haritası -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.725rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hedef Varış Noktası</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-top: 0.15rem;" id="txtWorkplaceName">Merkez Fabrika</div>
+          </div>
+          <span class="status-pill" style="font-size: 0.7rem; color: #f43f5e;" id="txtGeofenceRadius">180m Radar</span>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-val" id="metricSpeed">0 <span style="font-size:0.75rem;">km/s</span></div>
+            <div class="metric-label">Anlık Hız</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="metricAccuracy">±-- <span style="font-size:0.75rem;">m</span></div>
+            <div class="metric-label">GPS Hassasiyeti</div>
+          </div>
+        </div>
+
         <div id="driverMap"></div>
       </div>
-    </div>
 
-    <!-- 3. Dev Canlı Konum Başlat / Durdur Butonu -->
-    <div>
-      <button class="btn-action-gps start" id="btnToggleGps" onclick="toggleDriverGps()">
-        <span>📡</span>
-        <span id="btnGpsText">CANLI KONUMU BAŞLAT</span>
-      </button>
-    </div>
+      <!-- Bu Araca Atanan Yolcu / Öğrenci Listesi -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #fff;" id="titlePassengerList">👥 Araca Atanan Yolcular</h3>
+            <span style="font-size: 0.725rem; color: var(--text-muted);">Binen yolcuları işaretleyebilirsiniz.</span>
+          </div>
+          <span class="status-pill" style="font-size: 0.7rem; color: #34d399;" id="txtPassengerCount">0 Yolcu</span>
+        </div>
 
-    <!-- PWA Kurulum / Tarayıcı İpucu -->
-    <div class="pwa-notice">
-      <span style="font-size: 1.25rem;">📱</span>
-      <span>
-        <b>Telefonunuza İndirin:</b> Tarayıcı menüsünden <b>"Ana Ekrana Ekle"</b> seçeneğine basarak bir mobil uygulama gibi kullanabilirsiniz.
-      </span>
+        <div id="containerPassengersList">
+          <!-- JS ile doldurulacak -->
+        </div>
+      </div>
+
+      <!-- PWA Yükleme Kartı & İndirme Butonu -->
+      <div class="card" style="border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06); text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.35rem;">📱</div>
+        <h4 style="font-size: 1rem; font-weight: 700; color: #fff;">Uygulamayı Telefona İndir</h4>
+        <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0.35rem 0 0.85rem 0; line-height: 1.4;">
+          Şoför kokpitini doğrudan telefonunuzun ana ekranına uygulama (PWA) olarak ekleyin.
+        </p>
+        <button type="button" class="btn-action-gps start" id="btnInstallPwa" onclick="handlePwaInstallClick()" style="padding: 0.75rem 1rem; font-size: 0.9rem; justify-content: center;">
+          <span>📲 Ana Ekrana Ekle / İndir</span>
+        </button>
+      </div>
+
     </div>
 
   </main>
@@ -445,7 +544,7 @@
   <!-- Hedefe Varış Modalı -->
   <div class="arrival-overlay" id="modalArrival">
     <div class="arrival-card">
-      <div class="arrival-icon">🎯</div>
+      <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">🎯</div>
       <h2 style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">Hedefe Ulaşıldı!</h2>
       <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 1.5rem;" id="txtArrivalMsg">
         Fabrika sanal çitine giriş yaptınız. Canlı GPS yayını personeller ve yönetim için otomatik olarak kapatıldı.
@@ -460,16 +559,17 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <script>
-    let shuttlesList = [];
-    let selectedShuttle = null;
+    let activeShuttle = null;
+    let assignedPassengers = [];
     let watchId = null;
     let isTracking = false;
     let driverMap = null;
     let driverMarker = null;
     let accuracyCircle = null;
     let workplaceCircle = null;
+    let autoClockInterval = null;
 
-    // Web Audio Beep / Chime (No audio files needed!)
+    // Web Audio Beep / Chime
     function playBeep(freq = 600, duration = 0.15) {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -486,76 +586,241 @@
     }
 
     function playSuccessChime() {
-      playBeep(523.25, 0.15); // C5
-      setTimeout(() => playBeep(659.25, 0.15), 150); // E5
-      setTimeout(() => playBeep(783.99, 0.35), 300); // G5
+      playBeep(523.25, 0.15);
+      setTimeout(() => playBeep(659.25, 0.15), 150);
+      setTimeout(() => playBeep(783.99, 0.35), 300);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      loadShuttles();
+      // Daha önce giriş yapılmış mı kontrol et
+      const savedSession = localStorage.getItem('servis360_driver_session');
+      if (savedSession) {
+        try {
+          const session = JSON.parse(savedSession);
+          setupDriverDashboard(session.shuttle, session.passengers);
+        } catch (e) {
+          showLoginScreen();
+        }
+      } else {
+        showLoginScreen();
+      }
     });
 
-    async function loadShuttles() {
+    function showLoginScreen() {
+      document.getElementById('cardDriverLogin').style.display = 'block';
+      document.getElementById('sectionDriverCockpit').style.display = 'none';
+      document.getElementById('btnDriverLogout').style.display = 'none';
+      document.getElementById('txtHeaderRole').innerText = 'Şoför Girişi';
+    }
+
+    async function handleDriverLoginSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginInputUsername').value.trim();
+      const password = document.getElementById('loginInputPassword').value.trim();
+      const btn = document.getElementById('btnLoginSubmit');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>Giriş yapılıyor...</span>';
+
       try {
-        const res = await fetch('/api/shuttles/available');
+        const res = await fetch('/api/driver/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
         const data = await res.json();
-        if (data.success && data.shuttles) {
-          shuttlesList = data.shuttles;
-          const select = document.getElementById('selectShuttle');
-          
-          if (shuttlesList.length === 0) {
-            select.innerHTML = '<option value="">Kayıtlı servis aracı bulunamadı</option>';
-            return;
-          }
+        if (!res.ok) throw new Error(data.error || 'Giriş yapılamadı');
 
-          select.innerHTML = '<option value="">-- Aracınızı Seçiniz --</option>' + shuttlesList.map(s => `
-            <option value="${s.id}">
-              ${s.plate} - ${s.driver_name || 'Şoför'} (${s.company_name})
-            </option>
-          `).join('');
+        localStorage.setItem('servis360_driver_session', JSON.stringify({
+          shuttle: data.shuttle,
+          passengers: data.passengers
+        }));
 
-          // Otomatik olarak Akin Tekstil'i veya ilk aracı seç
-          const defaultShuttle = shuttlesList.find(s => s.plate.includes('41 ABC 41')) || shuttlesList[0];
-          if (defaultShuttle) {
-            select.value = defaultShuttle.id;
-            onShuttleSelect(defaultShuttle.id);
-          }
-        }
+        setupDriverDashboard(data.shuttle, data.passengers);
       } catch (err) {
-        console.error('Servisler yüklenemedi:', err);
+        alert('Giriş Hatası: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Giriş Yap ve Kokpiti Aç</span><span>➔</span>';
       }
     }
 
-    function onShuttleSelect(shuttleId) {
-      if (!shuttleId) {
-        selectedShuttle = null;
-        document.getElementById('shuttleDetailsCard').style.display = 'none';
-        document.getElementById('cardTelemetry').style.display = 'none';
+    function quickLogin(user, pass) {
+      document.getElementById('loginInputUsername').value = user;
+      document.getElementById('loginInputPassword').value = pass;
+      document.getElementById('btnLoginSubmit').click();
+    }
+
+    function handleDriverLogout() {
+      if (isTracking) stopTracking();
+      localStorage.removeItem('servis360_driver_session');
+      activeShuttle = null;
+      assignedPassengers = [];
+      showLoginScreen();
+    }
+
+    function setupDriverDashboard(shuttle, passengers) {
+      activeShuttle = shuttle;
+      assignedPassengers = passengers || [];
+
+      document.getElementById('cardDriverLogin').style.display = 'none';
+      document.getElementById('sectionDriverCockpit').style.display = 'flex';
+      document.getElementById('btnDriverLogout').style.display = 'block';
+      document.getElementById('txtHeaderRole').innerText = `${shuttle.plate} Kokpiti`;
+
+      document.getElementById('txtActivePlate').innerText = shuttle.plate;
+      document.getElementById('txtActiveCompany').innerText = shuttle.company_name;
+      document.getElementById('txtActiveDriver').innerText = shuttle.driver_name || 'Şoför';
+      document.getElementById('txtShiftStart').innerText = shuttle.shift_start_time || '07:15';
+      document.getElementById('txtShiftReturn').innerText = shuttle.return_time || '17:30';
+      document.getElementById('txtWorkplaceName').innerText = shuttle.workplace_name || 'Merkez Fabrika';
+      document.getElementById('txtGeofenceRadius').innerText = `${shuttle.geofence_radius_meters || 180}m Çit`;
+
+      const isSchool = shuttle.operation_type === 'school';
+      document.getElementById('txtOpTypeBadge').innerText = isSchool ? '🎓 Öğrenci Servisi' : '🏢 Personel Servisi';
+      document.getElementById('titlePassengerList').innerText = isSchool ? '🎓 Araca Atanan Öğrenciler' : '👥 Araca Atanan Personeller';
+
+      renderPassengerList();
+      initDriverMap();
+      startAutoShiftClockCheck();
+    }
+
+    function renderPassengerList() {
+      const container = document.getElementById('containerPassengersList');
+      const countEl = document.getElementById('txtPassengerCount');
+      countEl.innerText = `${assignedPassengers.length} Yolcu`;
+
+      if (assignedPassengers.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1.5rem 0;">
+            Bu araca henüz yolcu atanmamış.
+          </div>
+        `;
         return;
       }
 
-      selectedShuttle = shuttlesList.find(s => s.id == shuttleId);
-      if (selectedShuttle) {
-        document.getElementById('txtPlate').innerText = selectedShuttle.plate;
-        document.getElementById('txtCompany').innerText = selectedShuttle.company_name;
-        document.getElementById('txtDriver').innerText = selectedShuttle.driver_name || 'Şoför';
-        document.getElementById('txtShiftTime').innerText = `Başlama: ${selectedShuttle.shift_start_time || '07:15'}`;
-        document.getElementById('txtWorkplaceName').innerText = selectedShuttle.workplace_name || 'Merkez Fabrika';
-        document.getElementById('txtGeofenceRadius').innerText = `${selectedShuttle.geofence_radius_meters || 180}m Çit`;
-        
-        document.getElementById('shuttleDetailsCard').style.display = 'flex';
-        document.getElementById('cardTelemetry').style.display = 'block';
+      const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
 
-        initDriverMap();
+      container.innerHTML = assignedPassengers.map(p => {
+        const isBoarded = p.status === 'boarded';
+        const phone = isSchool ? (p.parent_phone || p.phone) : p.phone;
+        const subInfo = isSchool 
+          ? `Sınıf: ${p.student_class || '-'} • Veli: ${p.parent_name || '-'} (${p.parent_relation || 'Veli'})`
+          : `Departman: ${p.department || 'Genel'}`;
+
+        return `
+          <div class="passenger-item">
+            <div style="flex: 1; padding-right: 0.5rem;">
+              <div style="font-size: 0.9rem; font-weight: 700; color: #fff;">${p.full_name}</div>
+              <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.15rem;">${subInfo}</div>
+              <div style="font-size: 0.725rem; color: var(--accent-cyan); margin-top: 0.2rem;">
+                📍 ${p.stop_name || 'Durak Belirlenmedi'}
+                ${phone ? ` • <a href="tel:${phone}" style="color:var(--accent-cyan); text-decoration:none;">📞 ${phone}</a>` : ''}
+              </div>
+            </div>
+            <div>
+              <button class="btn-board ${isBoarded ? 'boarded' : 'waiting'}" onclick="togglePassengerBoarding(${p.id})">
+                ${isBoarded ? '✓ Bindi' : '⏳ Bekliyor'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function togglePassengerBoarding(passengerId) {
+      const p = assignedPassengers.find(x => x.id === passengerId);
+      if (!p) return;
+
+      const newStatus = p.status === 'boarded' ? 'waiting' : 'boarded';
+      p.status = newStatus;
+      renderPassengerList();
+
+      playBeep(isTracking ? 750 : 550, 0.1);
+
+      try {
+        await fetch(`/api/shuttle/${activeShuttle.id}/passengers/${passengerId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+      } catch (err) {
+        console.warn('Yolcu durumu iletilemedi:', err);
       }
+    }
+
+    // PWA Kurulum Olayı Dinleyicisi
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const btn = document.getElementById('btnInstallPwa');
+      if (btn) btn.style.display = 'inline-flex';
+    });
+
+    async function handlePwaInstallClick() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+      } else {
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIos) {
+          alert('📲 iPhone / iPad Kurulumu:\n\n1. Safari alt çubuğundaki "Paylaş" (kare içinden yukarı ok) simgesine dokunun.\n2. Açılan menüyü aşağı kaydırıp "Ana Ekrana Ekle" seçeneğine basın.\n\nServis360 Şoför uygulaması tam ekran olarak telefonunuza yüklenecektir.');
+        } else {
+          alert('📲 Android / Chrome Kurulumu:\n\n1. Tarayıcınızın sağ üstündeki 3 nokta (⋮) menüsüne dokunun.\n2. "Uygulamayı Yükle" veya "Ana Ekrana Ekle" seçeneğine basın.\n\nUygulama telefonunuza yüklenecektir.');
+        }
+      }
+    }
+
+    // Vardiya Saati Otomatik Kontrolü (07:15 ve 17:30 olduğunda otomatik alarm + canlı GPS başlatma)
+    function startAutoShiftClockCheck() {
+      if (autoClockInterval) clearInterval(autoClockInterval);
+      
+      // Bildirim İzni İste (Web Notification)
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
+      autoClockInterval = setInterval(() => {
+        if (isTracking || !activeShuttle) return;
+        const now = new Date();
+        const currentHours = now.getHours().toString().padStart(2, '0');
+        const currentMins = now.getMinutes().toString().padStart(2, '0');
+        const currentTimeStr = `${currentHours}:${currentMins}`;
+
+        // Başlama saati veya akşam dönüş saati geldiyse otomatik başlat!
+        if (currentTimeStr === activeShuttle.shift_start_time || currentTimeStr === activeShuttle.return_time) {
+          triggerSimulatedAutoStart();
+        }
+      }, 20000);
+    }
+
+    function triggerSimulatedAutoStart() {
+      if (isTracking) return;
+      playSuccessChime();
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+
+      // Web Notification Gönder
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification("🔔 Servis Saati Geldi!", {
+            body: `${activeShuttle.plate} için sefer saati (${activeShuttle.shift_start_time || '07:15'}). Canlı GPS akışı başlatıldı.`,
+            icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚐</text></svg>"
+          });
+        } catch (e) {}
+      }
+
+      alert(`⏰ SEFER SAATİ GELDİ (${activeShuttle.shift_start_time || '07:15'})!\n\nCanlı GPS konum akışı personeller, öğrenciler ve şirket yönetimi için otomatik olarak başlatıldı.`);
+      startTracking();
     }
 
     function initDriverMap() {
       const container = document.getElementById('driverMap');
-      if (!container || !selectedShuttle) return;
+      if (!container || !activeShuttle) return;
 
-      const targetLat = selectedShuttle.workplace_lat || 40.72318;
-      const targetLng = selectedShuttle.workplace_lng || 29.493785;
+      const targetLat = activeShuttle.workplace_lat || 40.72318;
+      const targetLng = activeShuttle.workplace_lng || 29.493785;
 
       if (!driverMap) {
         driverMap = L.map('driverMap', {
@@ -570,10 +835,9 @@
         driverMap.invalidateSize();
       }
 
-      // Hedef Sanal Çiti Çiz
       if (workplaceCircle) driverMap.removeLayer(workplaceCircle);
       workplaceCircle = L.circle([targetLat, targetLng], {
-        radius: selectedShuttle.geofence_radius_meters || 180,
+        radius: activeShuttle.geofence_radius_meters || 180,
         color: '#f43f5e',
         fillColor: '#f43f5e',
         fillOpacity: 0.2,
@@ -590,17 +854,14 @@
     }
 
     function startTracking() {
-      if (!selectedShuttle) {
-        alert('Lütfen önce servis aracınızı seçiniz.');
-        return;
-      }
+      if (!activeShuttle) return;
 
       if (!navigator.geolocation) {
         alert('Tarayıcınız GPS konum servisini desteklemiyor.');
         return;
       }
 
-      playBeep(880, 0.2); // Start confirmation sound
+      playBeep(880, 0.2);
       if (navigator.vibrate) navigator.vibrate(100);
 
       isTracking = true;
@@ -632,11 +893,9 @@
       const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
       const accuracy = Math.round(pos.coords.accuracy);
 
-      // Göstergeleri güncelle
       document.getElementById('metricSpeed').innerHTML = `${speedKmH} <span style="font-size:0.75rem;">km/s</span>`;
       document.getElementById('metricAccuracy').innerHTML = `±${accuracy} <span style="font-size:0.75rem;">m</span>`;
 
-      // Haritada aracın yerini güncelle
       if (driverMap) {
         if (!driverMarker) {
           const shuttleIcon = L.divIcon({
@@ -666,9 +925,8 @@
         driverMap.panTo([lat, lng]);
       }
 
-      // Sunucuya gerçek GPS koordinatlarını gönder (PostgreSQL'e işlenir!)
       try {
-        const res = await fetch(`/api/shuttle/${selectedShuttle.id}/location`, {
+        const res = await fetch(`/api/shuttle/${activeShuttle.id}/location`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -681,8 +939,6 @@
         });
 
         const data = await res.json();
-        
-        // Otomatik Geofence Girişi Algılandı mı?
         if (data.arrived) {
           triggerArrivalAutomation(data);
         }
@@ -699,7 +955,6 @@
     function triggerArrivalAutomation(data) {
       stopTracking();
 
-      // Titreşim ve Zafer Sesi
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
       playSuccessChime();
 

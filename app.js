@@ -206,6 +206,7 @@ function adaptUiForOperationType(operationType) {
       <th>Veli Telefonu (SMS)</th>
       <th>Servis (Plaka)</th>
       <th>Biniş Durağı</th>
+      <th>📱 Giriş Bilgileri (ID & Şifre)</th>
       <th>Servis Durumu</th>
     `;
   } else {
@@ -236,6 +237,7 @@ function adaptUiForOperationType(operationType) {
       <th>Telefon</th>
       <th>Atanan Servis</th>
       <th>Biniş Durağı</th>
+      <th>📱 Giriş Bilgileri (ID & Şifre)</th>
       <th>Durum</th>
     `;
   }
@@ -1159,17 +1161,82 @@ function renderCompanyShuttles(shuttles) {
     return;
   }
 
-  tbody.innerHTML = shuttles.map(s => `
-    <tr>
-      <td><b style="color:#fff; font-size:0.9rem;">${s.plate}</b></td>
-      <td>${s.model || 'Minibüs'}</td>
-      <td><span class="badge-tag badge-portal">${s.capacity} Kişilik</span></td>
-      <td>${s.driver_name || '-'}</td>
-      <td>${s.driver_phone || '-'}</td>
-      <td><b style="color:var(--accent-amber);">${s.shift_start_time || '07:15'}</b></td>
-      <td><span class="badge-tag badge-success">Hazır</span></td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = shuttles.map(s => {
+    const driverUser = s.driver_username || (s.plate || '').replace(/\s+/g, '').toUpperCase();
+    const driverPass = s.driver_password || '123456';
+    const sJson = encodeURIComponent(JSON.stringify(s));
+
+    return `
+      <tr>
+        <td><b style="color:#fff; font-size:0.9rem; font-family:'Fira Code', monospace;">${s.plate}</b></td>
+        <td>
+          <span style="color:#e2e8f0;">${s.model || 'Minibüs'}</span><br>
+          <span class="badge-tag badge-portal" style="font-size:0.7rem;">${s.capacity} Kişilik</span>
+        </td>
+        <td>
+          <span style="font-weight:600; color:#fff;">${s.driver_name || '-'}</span><br>
+          <span style="font-size:0.75rem; color:var(--accent-cyan);">${s.driver_phone || '-'}</span>
+        </td>
+        <td><b style="color:var(--accent-amber);">🌅 ${s.shift_start_time || '07:15'}</b></td>
+        <td><b style="color:#60a5fa;">🌇 ${s.return_time || '17:30'}</b></td>
+        <td>
+          <span style="font-size:0.75rem; color:#cbd5e1; font-family:'Fira Code', monospace;">ID: <b>${driverUser}</b></span><br>
+          <span style="font-size:0.75rem; color:#34d399; font-family:'Fira Code', monospace;">Şifre: <b>${driverPass}</b></span>
+        </td>
+        <td>
+          <button class="btn-action secondary" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="openEditShuttleModal('${sJson}')">
+            ✏️ Düzenle
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openEditShuttleModal(encodedShuttle) {
+  const s = JSON.parse(decodeURIComponent(encodedShuttle));
+  document.getElementById('editShuttleId').value = s.id;
+  document.getElementById('editShuttlePlate').value = s.plate;
+  document.getElementById('editShuttleCapacity').value = s.capacity;
+  document.getElementById('editShuttleModel').value = s.model || 'Mercedes-Benz Sprinter';
+  document.getElementById('editShuttleDriverName').value = s.driver_name || '';
+  document.getElementById('editShuttleDriverPhone').value = s.driver_phone || '';
+  document.getElementById('editShuttleShiftTime').value = s.shift_start_time || '07:15';
+  document.getElementById('editShuttleReturnTime').value = s.return_time || '17:30';
+  document.getElementById('editShuttlePassword').value = s.driver_password || '123456';
+
+  openModal('modalEditShuttle');
+}
+
+async function handleEditShuttleSubmit(e) {
+  e.preventDefault();
+  const shuttleId = document.getElementById('editShuttleId').value;
+  const payload = {
+    plate: document.getElementById('editShuttlePlate').value.trim(),
+    capacity: parseInt(document.getElementById('editShuttleCapacity').value),
+    model: document.getElementById('editShuttleModel').value.trim(),
+    driver_name: document.getElementById('editShuttleDriverName').value.trim(),
+    driver_phone: document.getElementById('editShuttleDriverPhone').value.trim(),
+    shift_start_time: document.getElementById('editShuttleShiftTime').value,
+    return_time: document.getElementById('editShuttleReturnTime').value,
+    driver_password: document.getElementById('editShuttlePassword').value.trim()
+  };
+
+  try {
+    const res = await fetch(`/api/company/${state.activeCompanyId}/shuttles/${shuttleId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Güncellenemedi');
+
+    closeModal('modalEditShuttle');
+    await loadCompanyData(state.activeCompanyId);
+    showToast("Servis Güncellendi", `${payload.plate} bilgileri ve sefer saatleri kaydedildi.`, "success");
+  } catch (err) {
+    showToast("Hata", err.message, "danger");
+  }
 }
 
 async function handleCreateShuttleSubmit(e) {
@@ -1180,7 +1247,9 @@ async function handleCreateShuttleSubmit(e) {
     model: document.getElementById('shuttleInputModel').value.trim(),
     driver_name: document.getElementById('shuttleInputDriverName').value.trim(),
     driver_phone: document.getElementById('shuttleInputDriverPhone').value.trim(),
-    shift_start_time: document.getElementById('shuttleInputShiftTime').value
+    shift_start_time: document.getElementById('shuttleInputShiftTime').value,
+    return_time: document.getElementById('shuttleInputReturnTime').value,
+    driver_password: document.getElementById('shuttleInputPassword').value.trim()
   };
 
   try {
@@ -1249,7 +1318,7 @@ async function deleteRoute(routeId) {
   }
 }
 
-// Personeller veya Öğrenciler/Velileri Tabloya Bas
+// Personeller veya Öğrenciler/Velileri Tabloya Bas (ID & Şifre Bilgisiyle)
 function renderCompanyEmployees(employees, operationType) {
   const tbody = document.getElementById('tbodyCompanyEmployees');
   const isSchool = operationType === 'school';
@@ -1257,33 +1326,68 @@ function renderCompanyEmployees(employees, operationType) {
   document.getElementById('badgeEmployeeCount').innerText = employees.length;
 
   if (employees.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Henüz ${isSchool ? 'öğrenci' : 'personel'} kaydı yapılmamış.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Henüz ${isSchool ? 'öğrenci' : 'personel'} kaydı yapılmamış.</td></tr>`;
     return;
   }
 
   if (isSchool) {
-    tbody.innerHTML = employees.map(e => `
-      <tr>
-        <td><b style="color:#fff;">${e.full_name}</b></td>
-        <td><span class="badge-tag" style="background:rgba(59,130,246,0.15); color:#60a5fa;">${e.student_class || 'Sınıf Yok'} / No: ${e.student_number || '-'}</span></td>
-        <td><b>${e.parent_name || '-'}</b> <span style="font-size:0.75rem; color:var(--text-muted);">(${e.parent_relation || 'Veli'})</span></td>
-        <td><span style="color:var(--accent-cyan);">${e.parent_phone || e.phone || '-'}</span></td>
-        <td><span class="badge-tag badge-portal">${e.shuttle_plate || 'Atanmadı'}</span></td>
-        <td>${e.stop_name || 'Durak Belirlenmedi'}</td>
-        <td><span class="badge-tag badge-success">Servise Bindi</span></td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = employees.map(e => {
+      const loginId = e.login_id || ('PRS-' + (1000 + e.id));
+      const loginPass = e.login_pass || '123456';
+      const isDriver = e.role === 'driver';
+
+      return `
+        <tr>
+          <td><b style="color:#fff;">${e.full_name}</b></td>
+          <td><span class="badge-tag" style="background:rgba(59,130,246,0.15); color:#60a5fa;">${e.student_class || 'Sınıf Yok'} / No: ${e.student_number || '-'}</span></td>
+          <td><b>${e.parent_name || '-'}</b> <span style="font-size:0.75rem; color:var(--text-muted);">(${e.parent_relation || 'Veli'})</span></td>
+          <td><span style="color:var(--accent-cyan);">${e.parent_phone || e.phone || '-'}</span></td>
+          <td><span class="badge-tag badge-portal">${e.shuttle_plate || 'Atanmadı'}</span></td>
+          <td>${e.stop_name || 'Durak Belirlenmedi'}</td>
+          <td>
+            ${isDriver ? '<span class="badge-tag" style="background:rgba(16,185,129,0.2); color:#34d399; font-weight:700; font-size:0.65rem; margin-bottom:0.2rem; display:inline-block;">🚗 ŞOFÖR</span><br>' : ''}
+            <span style="font-size:0.75rem; color:#cbd5e1; font-family:'Fira Code', monospace;">ID: <b>${loginId}</b></span><br>
+            <span style="font-size:0.75rem; color:#34d399; font-family:'Fira Code', monospace;">Şifre: <b>${loginPass}</b></span>
+          </td>
+          <td><span class="badge-tag badge-success">${e.status === 'boarded' ? 'Serviste' : 'Bekliyor'}</span></td>
+        </tr>
+      `;
+    }).join('');
   } else {
-    tbody.innerHTML = employees.map(e => `
-      <tr>
-        <td><b style="color:#fff;">${e.full_name}</b></td>
-        <td>${e.department || 'Genel'}</td>
-        <td>${e.phone || '-'}</td>
-        <td><span class="badge-tag badge-portal">${e.shuttle_plate || 'Atanmadı'}</span></td>
-        <td>${e.stop_name || 'Durak Belirlenmedi'}</td>
-        <td><span class="badge-tag badge-success">Aktif</span></td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = employees.map(e => {
+      const loginId = e.login_id || ('PRS-' + (1000 + e.id));
+      const loginPass = e.login_pass || '123456';
+      const isDriver = e.role === 'driver';
+
+      return `
+        <tr>
+          <td><b style="color:#fff;">${e.full_name}</b></td>
+          <td>${e.department || 'Genel'}</td>
+          <td>${e.phone || '-'}</td>
+          <td><span class="badge-tag badge-portal">${e.shuttle_plate || 'Atanmadı'}</span></td>
+          <td>${e.stop_name || 'Durak Belirlenmedi'}</td>
+          <td>
+            ${isDriver ? '<span class="badge-tag" style="background:rgba(16,185,129,0.2); color:#34d399; font-weight:700; font-size:0.65rem; margin-bottom:0.2rem; display:inline-block;">🚗 ŞOFÖR</span><br>' : ''}
+            <span style="font-size:0.75rem; color:#cbd5e1; font-family:'Fira Code', monospace;">ID: <b>${loginId}</b></span><br>
+            <span style="font-size:0.75rem; color:#34d399; font-family:'Fira Code', monospace;">Şifre: <b>${loginPass}</b></span>
+          </td>
+          <td><span class="badge-tag badge-success">${e.status === 'boarded' ? 'Serviste' : 'Aktif'}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
+function handleEmpRoleChange(role) {
+  const loginInput = document.getElementById('empInputLoginId');
+  if (role === 'driver') {
+    if (!loginInput.value || loginInput.value.startsWith('PRS-')) {
+      loginInput.value = 'SOFOR-' + Math.floor(100 + Math.random() * 900);
+    }
+  } else {
+    if (!loginInput.value || loginInput.value.startsWith('SOFOR-')) {
+      loginInput.value = 'PRS-' + Math.floor(1000 + Math.random() * 9000);
+    }
   }
 }
 
@@ -1292,11 +1396,17 @@ async function handleCreateEmployeeSubmit(e) {
   e.preventDefault();
   const isSchool = state.activeCompanyData && state.activeCompanyData.company.operation_type === 'school';
   const shuttleId = parseInt(document.getElementById('empInputShuttleSelect').value) || null;
+  const role = document.getElementById('empInputRole').value;
+  const loginId = document.getElementById('empInputLoginId').value.trim();
+  const loginPass = document.getElementById('empInputLoginPass').value.trim() || '123456';
 
   const payload = {
     full_name: document.getElementById('empInputFullName').value.trim(),
     passenger_type: isSchool ? 'student' : 'employee',
     shuttle_id: shuttleId,
+    role: role,
+    login_id: loginId || undefined,
+    login_pass: loginPass,
     // Personel alanları
     department: isSchool ? null : document.getElementById('empInputDept').value.trim(),
     phone: isSchool ? null : document.getElementById('empInputPhone').value.trim(),
@@ -1319,7 +1429,7 @@ async function handleCreateEmployeeSubmit(e) {
 
     closeModal('modalCreateEmployee');
     await loadCompanyData(state.activeCompanyId);
-    showToast("Kayıt Eklendi", `${payload.full_name} (${isSchool ? 'Öğrenci & Veli' : 'Personel'}) servise kaydedildi.`, "success");
+    showToast("Kayıt Eklendi", `${payload.full_name} (${role === 'driver' ? '🚗 Şoför' : 'Yolcu'}) sisteme kaydedildi. Giriş ID: ${data.employee.login_id}`, "success");
   } catch (err) {
     showToast("Hata", err.message, "danger");
   }

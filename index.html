@@ -116,7 +116,14 @@
             <span>Canlı Servis Takip</span>
           </button>
 
-          <!-- 6. Menü: Şartlı Entegrasyon -->
+          <!-- 6. Şoför Mobil Kokpit Uygulaması -->
+          <a href="/driver.html" target="_blank" class="sidebar-item" style="text-decoration: none; color: #34d399; background: rgba(16,185,129,0.1); border: 1px dashed rgba(16,185,129,0.3); margin-top: 0.5rem;">
+            <span>📱</span>
+            <span>Şoför Kokpiti (PWA)</span>
+            <span class="badge" style="background:#10b981; color:#080c14; font-weight:800;">AÇ ➔</span>
+          </a>
+
+          <!-- 7. Menü: Şartlı Entegrasyon -->
           <button class="sidebar-item" id="btnNavCompanyIntegration" style="display: none;" onclick="navigateTo('companyIntegration')">
             <span>🔌</span>
             <span>Entegrasyon & API</span>
@@ -151,6 +158,10 @@
           <p id="pageSubHeading">Kayıtlı kurumsal müşteriler ve hesap tanımlama</p>
         </div>
         <div class="topbar-meta">
+          <a href="/driver.html" target="_blank" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.8rem; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border-radius:8px; font-size:0.75rem; font-weight:700; box-shadow: 0 4px 12px rgba(16,185,129,0.3);">
+            <span>📱 Şoför Canlı GPS Kokpiti</span>
+            <span>➔</span>
+          </a>
           <span class="badge-tag badge-portal" id="topbarCompanyBadge" style="display: none;">TechNova Holding</span>
           <span class="badge-tag badge-success" id="topbarOperationTag">🏢 Personel Modu</span>
           <span class="badge-tag badge-success">🛣️ OSRM Gerçek Yol Motoru</span>
@@ -317,12 +328,12 @@
                 <thead>
                   <tr>
                     <th>Plaka</th>
-                    <th>Model</th>
-                    <th>Kapasite</th>
-                    <th>Şoför Adı</th>
-                    <th>Şoför Telefonu</th>
-                    <th>İşe Başlama Saati</th>
-                    <th>Canlı Durum</th>
+                    <th>Model & Kapasite</th>
+                    <th>Şoför Bilgisi</th>
+                    <th>🌅 Başlama Saati</th>
+                    <th>🌇 Dönüş Saati</th>
+                    <th>📱 Şoför Giriş Bilgisi</th>
+                    <th>İşlem</th>
                   </tr>
                 </thead>
                 <tbody id="tbodyCompanyShuttles">
@@ -646,14 +657,89 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label>🌅 İşe / Okula Başlama Saati</label>
+            <input type="time" id="shuttleInputShiftTime" class="form-control" value="07:15" required>
+          </div>
+          <div class="form-group">
+            <label>🌇 Dönüş Saati (Çıkış)</label>
+            <input type="time" id="shuttleInputReturnTime" class="form-control" value="17:30" required>
+          </div>
+        </div>
+
         <div class="form-group">
-          <label>İşe / Okula Başlama Saati</label>
-          <input type="time" id="shuttleInputShiftTime" class="form-control" value="07:15" required>
+          <label>Şoför Mobil Uygulama Şifresi</label>
+          <input type="text" id="shuttleInputPassword" class="form-control" value="123456" required>
+          <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+            * Şoför telefondan giriş yaparken Kullanıcı Adı: Plaka (örn: 34DEF456), Şifre: bu şifre olacaktır.
+          </span>
         </div>
 
         <div style="display:flex; justify-content: flex-end; gap:0.5rem; margin-top:1.5rem;">
           <button type="button" class="btn-action secondary" onclick="closeModal('modalCreateShuttle')">Vazgeç</button>
           <button type="submit" class="btn-action success">Servisi Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SERVİS BİLGİLERİNİ & SAATLERİNİ DÜZENLE -->
+  <div class="modal-overlay" id="modalEditShuttle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="color:#fff; font-size:1.15rem; font-weight:700;">✏️ Servis & Saatleri Düzenle</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalEditShuttle')">&times;</button>
+      </div>
+
+      <form onsubmit="handleEditShuttleSubmit(event)">
+        <input type="hidden" id="editShuttleId">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Servis Plakası</label>
+            <input type="text" id="editShuttlePlate" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Kapasite (Kişi)</label>
+            <input type="number" id="editShuttleCapacity" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Araç Modeli</label>
+          <input type="text" id="editShuttleModel" class="form-control" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Şoför Adı Soyadı</label>
+            <input type="text" id="editShuttleDriverName" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Şoför Telefonu</label>
+            <input type="text" id="editShuttleDriverPhone" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>🌅 Başlama Saati</label>
+            <input type="time" id="editShuttleShiftTime" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>🌇 Dönüş Saati</label>
+            <input type="time" id="editShuttleReturnTime" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Şoför Mobil Şifresi</label>
+          <input type="text" id="editShuttlePassword" class="form-control" required>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; gap:0.5rem; margin-top:1.5rem;">
+          <button type="button" class="btn-action secondary" onclick="closeModal('modalEditShuttle')">Vazgeç</button>
+          <button type="submit" class="btn-action success">💾 Değişiklikleri Kaydet</button>
         </div>
       </form>
     </div>
@@ -723,6 +809,28 @@
               <option value="Veli">Yasal Veli / Vasi</option>
             </select>
           </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rol / Sistem Görevi</label>
+            <select id="empInputRole" class="form-control" onchange="handleEmpRoleChange(this.value)">
+              <option value="passenger" selected>Yolcu / Personel</option>
+              <option value="driver">🚗 Servis Şoförü (Mobil Kokpit Girişi)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mobil Giriş ID (Kullanıcı Adı)</label>
+            <input type="text" id="empInputLoginId" class="form-control" placeholder="Otomatik: PRS-XXXX">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mobil Uygulama Giriş Şifresi</label>
+          <input type="text" id="empInputLoginPass" class="form-control" value="123456" required>
+          <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+            * Şoför veya personel telefonundaki uygulamaya girerken bu ID ve şifre ile giriş yapacaktır.
+          </span>
         </div>
 
         <div class="form-group">

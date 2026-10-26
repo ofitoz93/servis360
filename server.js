@@ -198,20 +198,70 @@ app.post('/api/company/:companyId/workplace', async (req, res) => {
   }
 });
 
-// Servis Ekleme
+// Servis Ekleme (Başlama ve Dönüş Saati + Şoför Giriş Bilgileri)
 app.post('/api/company/:companyId/shuttles', async (req, res) => {
   const { companyId } = req.params;
-  const { plate, model, capacity, driver_name, driver_phone, shift_start_time } = req.body;
+  const { plate, model, capacity, driver_name, driver_phone, shift_start_time, return_time, driver_password } = req.body;
+
+  const defaultUsername = (plate || '').replace(/\s+/g, '').toUpperCase();
+  const defaultPassword = driver_password || '123456';
 
   try {
     const insertRes = await pool.query(`
       INSERT INTO shuttles 
-      (company_id, plate, model, capacity, driver_name, driver_phone, shift_start_time, current_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'waiting')
+      (company_id, plate, model, capacity, driver_name, driver_phone, shift_start_time, return_time, driver_username, driver_password, current_status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'waiting')
       RETURNING *
-    `, [companyId, plate, model || 'Servis Minibüsü', capacity || 24, driver_name, driver_phone, shift_start_time || '07:15']);
+    `, [
+      companyId,
+      plate,
+      model || 'Servis Minibüsü',
+      capacity || 24,
+      driver_name,
+      driver_phone,
+      shift_start_time || '07:15',
+      return_time || '17:30',
+      defaultUsername,
+      defaultPassword
+    ]);
 
     res.json({ success: true, shuttle: insertRes.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Servis Düzenleme (Saatler ve Şoför Bilgileri Güncelleme)
+app.put('/api/company/:companyId/shuttles/:shuttleId', async (req, res) => {
+  const { companyId, shuttleId } = req.params;
+  const { plate, model, capacity, driver_name, driver_phone, shift_start_time, return_time, driver_password } = req.body;
+
+  try {
+    const updateRes = await pool.query(`
+      UPDATE shuttles 
+      SET plate = $1, model = $2, capacity = $3, driver_name = $4, driver_phone = $5,
+          shift_start_time = $6, return_time = $7, driver_password = COALESCE($8, driver_password)
+      WHERE id = $9 AND company_id = $10
+      RETURNING *
+    `, [
+      plate,
+      model,
+      capacity,
+      driver_name,
+      driver_phone,
+      shift_start_time,
+      return_time || '17:30',
+      driver_password,
+      shuttleId,
+      companyId
+    ]);
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Servis aracı bulunamadı.' });
+    }
+
+    res.json({ success: true, shuttle: updateRes.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -285,7 +335,7 @@ app.delete('/api/company/:companyId/routes/:routeId', async (req, res) => {
   }
 });
 
-// Personel VEYA Öğrenci/Veli Ekleme
+// Personel VEYA Öğrenci/Veli Ekleme (Otomatik ID & Şifre Üretimi)
 app.post('/api/company/:companyId/employees', async (req, res) => {
   const { companyId } = req.params;
   const {
@@ -299,14 +349,23 @@ app.post('/api/company/:companyId/employees', async (req, res) => {
     student_number,
     parent_name,
     parent_phone,
-    parent_relation
+    parent_relation,
+    role, // 'passenger' | 'driver'
+    login_id,
+    login_pass
   } = req.body;
+
+  // Otomatik Login ID ve Şifre Üretimi (Eğer kullanıcı girmediyse)
+  const autoLoginId = login_id || ((role === 'driver' ? 'SOFOR-' : 'PRS-') + Math.floor(1000 + Math.random() * 9000));
+  const autoLoginPass = login_pass || '123456';
+  const assignedRole = role || 'passenger';
 
   try {
     const empRes = await pool.query(`
       INSERT INTO employees 
-      (company_id, shuttle_id, stop_id, full_name, department, phone, status, passenger_type, student_class, student_number, parent_name, parent_phone, parent_relation)
-      VALUES ($1, $2, $3, $4, $5, $6, 'waiting', $7, $8, $9, $10, $11, $12)
+      (company_id, shuttle_id, stop_id, full_name, department, phone, status, passenger_type, 
+       student_class, student_number, parent_name, parent_phone, parent_relation, role, login_id, login_pass)
+      VALUES ($1, $2, $3, $4, $5, $6, 'waiting', $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `, [
       companyId,
@@ -320,10 +379,24 @@ app.post('/api/company/:companyId/employees', async (req, res) => {
       student_number || null,
       parent_name || null,
       parent_phone || null,
-      parent_relation || 'Veli'
+      parent_relation || 'Veli',
+      assignedRole,
+      autoLoginId,
+      autoLoginPass
     ]);
 
-    res.json({ success: true, employee: empRes.rows[0] });
+    const createdEmp = empRes.rows[0];
+
+    // Eğer 'Servis Şoförü' olarak eklendiyse ve servis aracı seçildiyse, servis aracının şoför bilgilerini de güncelle
+    if (assignedRole === 'driver' && shuttle_id) {
+      await pool.query(`
+        UPDATE shuttles 
+        SET driver_name = $1, driver_phone = $2, driver_username = $3, driver_password = $4
+        WHERE id = $5
+      `, [full_name, phone || '', autoLoginId, autoLoginPass, shuttle_id]);
+    }
+
+    res.json({ success: true, employee: createdEmp });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -424,6 +497,119 @@ app.get('/api/shuttle/:shuttleId/location', async (req, res) => {
     }
 
     res.json({ success: true, shuttle: resRow.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Şoför Mobil Uygulaması: Giriş (Kullanıcı Adı/Plaka + Şifre)
+app.post('/api/driver/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Kullanıcı adı/plaka ve şifre zorunludur.' });
+  }
+
+  const cleanUser = username.trim().toUpperCase().replace(/\s+/g, '');
+  try {
+    const shuttleRes = await pool.query(`
+      SELECT s.*, 
+             c.company_name, c.workplace_name, c.workplace_lat, c.workplace_lng, c.geofence_radius_meters, c.operation_type
+      FROM shuttles s
+      JOIN companies c ON s.company_id = c.id
+      WHERE (UPPER(REPLACE(s.driver_username, ' ', '')) = $1 
+         OR UPPER(REPLACE(s.plate, ' ', '')) = $1 
+         OR s.driver_phone = $1)
+        AND s.driver_password = $2
+    `, [cleanUser, password.trim()]);
+
+    let shuttle = null;
+
+    if (shuttleRes.rows.length > 0) {
+      shuttle = shuttleRes.rows[0];
+    } else {
+      // 2. Yol: Personel / Şoför olarak employees tablosunda kayıtlı mı kontrol et
+      const empRes = await pool.query(`
+        SELECT e.*, s.id as shuttle_id
+        FROM employees e
+        JOIN shuttles s ON e.shuttle_id = s.id
+        WHERE (UPPER(REPLACE(e.login_id, ' ', '')) = $1 OR e.phone = $1)
+          AND e.login_pass = $2
+      `, [cleanUser, password.trim()]);
+
+      if (empRes.rows.length > 0 && empRes.rows[0].shuttle_id) {
+        const foundShuttleId = empRes.rows[0].shuttle_id;
+        const matchedShuttleRes = await pool.query(`
+          SELECT s.*, 
+                 c.company_name, c.workplace_name, c.workplace_lat, c.workplace_lng, c.geofence_radius_meters, c.operation_type
+          FROM shuttles s
+          JOIN companies c ON s.company_id = c.id
+          WHERE s.id = $1
+        `, [foundShuttleId]);
+
+        if (matchedShuttleRes.rows.length > 0) {
+          shuttle = matchedShuttleRes.rows[0];
+        }
+      }
+    }
+
+    if (!shuttle) {
+      return res.status(401).json({ error: 'Hatalı kullanıcı adı, personel ID, plaka veya şifre girdiniz.' });
+    }
+
+    // Bu araca atanan yolcuları / personelleri / öğrencileri biniş duraklarıyla çek
+    const passRes = await pool.query(`
+      SELECT e.*, st.stop_name, st.stop_order, st.eta_time
+      FROM employees e
+      LEFT JOIN stops st ON e.stop_id = st.id
+      WHERE e.shuttle_id = $1
+      ORDER BY COALESCE(st.stop_order, 999) ASC, e.id ASC
+    `, [shuttle.id]);
+
+    res.json({
+      success: true,
+      shuttle,
+      passengers: passRes.rows
+    });
+  } catch (err) {
+    console.error('Driver login error:', err);
+    res.status(500).json({ error: 'Giriş sırasında hata oluştu: ' + err.message });
+  }
+});
+
+// Şoförün aracına atanan yolcuları getirme
+app.get('/api/shuttle/:shuttleId/passengers', async (req, res) => {
+  const { shuttleId } = req.params;
+  try {
+    const passRes = await pool.query(`
+      SELECT e.*, st.stop_name, st.stop_order, st.eta_time
+      FROM employees e
+      LEFT JOIN stops st ON e.stop_id = st.id
+      WHERE e.shuttle_id = $1
+      ORDER BY COALESCE(st.stop_order, 999) ASC, e.id ASC
+    `, [shuttleId]);
+
+    res.json({ success: true, passengers: passRes.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Şoförün yolcuyu 'Servise Bindi' / 'Binmedi' olarak işaretlemesi
+app.post('/api/shuttle/:shuttleId/passengers/:passengerId/status', async (req, res) => {
+  const { shuttleId, passengerId } = req.params;
+  const { status } = req.body; // 'boarded' | 'waiting' | 'absent'
+
+  try {
+    const updateRes = await pool.query(`
+      UPDATE employees
+      SET status = $1
+      WHERE id = $2 AND shuttle_id = $3
+      RETURNING *
+    `, [status || 'boarded', passengerId, shuttleId]);
+
+    res.json({ success: true, passenger: updateRes.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
