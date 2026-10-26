@@ -29,22 +29,51 @@
         <p>Personel & Öğrenci Servis Portalı</p>
       </div>
 
+      <!-- Giriş Türü Seçici Sekmeler -->
+      <div class="login-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; background: rgba(255,255,255,0.04); padding: 0.35rem; border-radius: 12px; border: 1px solid var(--border-color);">
+        <button type="button" class="btn-tab active" id="tabLoginAdmin" onclick="setLoginType('admin')" style="flex: 1; padding: 0.55rem; font-size: 0.775rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.2s;">
+          🏢 Yönetici / İK
+        </button>
+        <button type="button" class="btn-tab" id="tabLoginDriver" onclick="setLoginType('driver')" style="flex: 1; padding: 0.55rem; font-size: 0.775rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">
+          🚐 Şoför & Personel
+        </button>
+      </div>
+
       <form id="mainLoginForm" onsubmit="handleLoginSubmit(event)">
         <div class="form-group">
-          <label for="inputEmail">E-posta Adresi</label>
-          <input type="email" id="inputEmail" class="form-control" placeholder="E-posta adresinizi giriniz" required autocomplete="username">
+          <label for="inputEmail" id="labelLoginUsername">E-posta, Plaka veya Personel ID</label>
+          <input type="text" id="inputEmail" class="form-control" placeholder="Örn: 41 ABC 41, PRS-1005 veya admin@servis360.com" required autocomplete="username">
+          <span id="hintLoginUsername" style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-top: 0.35rem;">
+            * Şoförler plaka (örn: 41 ABC 41), personeller ID (PRS-1005), yöneticiler e-posta ile giriş yapabilir.
+          </span>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-top: 0.85rem;">
           <label for="inputPassword">Şifre</label>
-          <input type="password" id="inputPassword" class="form-control" placeholder="Şifrenizi giriniz" required autocomplete="current-password">
+          <input type="password" id="inputPassword" class="form-control" placeholder="Şifrenizi giriniz" required autocomplete="current-password" value="123456">
         </div>
 
         <button type="submit" class="btn-primary" id="btnLoginSubmit" style="margin-top: 1.5rem;">
-          <span>Giriş Yap</span>
+          <span id="txtBtnLogin">Giriş Yap</span>
           <span>➔</span>
         </button>
       </form>
+
+      <!-- Hızlı Seçim Butonları -->
+      <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
+        <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">HIZLI DENEME GİRİŞLERİ:</span>
+        <div style="display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;">
+          <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('admin@servis360.com', '123456')">
+            🏢 Admin Girişi
+          </button>
+          <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('41 ABC 41', '123456')">
+            🚐 41 ABC 41 (Şoför)
+          </button>
+          <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('PRS-1005', '123456')">
+            👤 PRS-1005 (Personel)
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

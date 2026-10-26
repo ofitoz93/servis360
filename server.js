@@ -19,33 +19,101 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
-// --- GİRİŞ (AUTHENTICATION) ---
+// --- GİRİŞ (AUTHENTICATION - YÖNETİCİ, FİRMA, ŞOFÖR VEYA PERSONEL) ---
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Kullanıcı bilgisi ve şifre zorunludur.' });
+  }
+
+  const rawInput = email.trim();
+  const cleanUser = rawInput.toUpperCase().replace(/\s+/g, '');
+  const cleanPass = password.trim();
+
   try {
+    // 1. Önce Yönetici / Firma Kullanıcılarında Ara (E-posta ile)
     const userRes = await pool.query(
       `SELECT u.id, u.company_id, u.email, u.full_name, u.role, u.password, 
               c.company_name, c.service_type, c.operation_type 
        FROM users u 
        LEFT JOIN companies c ON u.company_id = c.id 
-       WHERE u.email = $1`,
-      [email]
+       WHERE LOWER(u.email) = LOWER($1)`,
+      [rawInput]
     );
 
-    if (userRes.rows.length === 0) {
-      return res.status(401).json({ error: 'Kullanıcı bulunamadı.' });
+    if (userRes.rows.length > 0) {
+      const user = userRes.rows[0];
+      if (user.password !== cleanPass) {
+        return res.status(401).json({ error: 'Hatalı şifre girdiniz.' });
+      }
+      delete user.password;
+      return res.json({ success: true, user });
     }
 
-    const user = userRes.rows[0];
-    if (user.password !== password) {
-      return res.status(401).json({ error: 'Hatalı şifre girdiniz.' });
+    // 2. Eğer kullanıcı tablosunda yoksa, Servis Şoförü / Plaka kontrolü yap
+    const shuttleRes = await pool.query(`
+      SELECT s.*, 
+             c.company_name, c.workplace_name, c.workplace_lat, c.workplace_lng, c.geofence_radius_meters, c.operation_type
+      FROM shuttles s
+      JOIN companies c ON s.company_id = c.id
+      WHERE (UPPER(REPLACE(s.driver_username, ' ', '')) = $1 
+         OR UPPER(REPLACE(s.plate, ' ', '')) = $1 
+         OR s.driver_phone = $1)
+        AND s.driver_password = $2
+    `, [cleanUser, cleanPass]);
+
+    let shuttle = null;
+    if (shuttleRes.rows.length > 0) {
+      shuttle = shuttleRes.rows[0];
+    } else {
+      // 3. Personel / Şoför ID (PRS-1005 veya Telefon) kontrolü yap
+      const empRes = await pool.query(`
+        SELECT e.*, s.id as shuttle_id
+        FROM employees e
+        JOIN shuttles s ON e.shuttle_id = s.id
+        WHERE (UPPER(REPLACE(e.login_id, ' ', '')) = $1 OR e.phone = $1)
+          AND e.login_pass = $2
+      `, [cleanUser, cleanPass]);
+
+      if (empRes.rows.length > 0 && empRes.rows[0].shuttle_id) {
+        const foundShuttleId = empRes.rows[0].shuttle_id;
+        const matchedShuttleRes = await pool.query(`
+          SELECT s.*, 
+                 c.company_name, c.workplace_name, c.workplace_lat, c.workplace_lng, c.geofence_radius_meters, c.operation_type
+          FROM shuttles s
+          JOIN companies c ON s.company_id = c.id
+          WHERE s.id = $1
+        `, [foundShuttleId]);
+
+        if (matchedShuttleRes.rows.length > 0) {
+          shuttle = matchedShuttleRes.rows[0];
+        }
+      }
     }
 
-    delete user.password;
-    res.json({ success: true, user });
+    // Eğer Şoför / Servis bulunduysa kokpit yönlendirmesiyle yanıt ver!
+    if (shuttle) {
+      const passRes = await pool.query(`
+        SELECT e.*, st.stop_name, st.stop_order, st.eta_time
+        FROM employees e
+        LEFT JOIN stops st ON e.stop_id = st.id
+        WHERE e.shuttle_id = $1
+        ORDER BY COALESCE(st.stop_order, 999) ASC, e.id ASC
+      `, [shuttle.id]);
+
+      return res.json({
+        success: true,
+        is_driver: true,
+        shuttle,
+        passengers: passRes.rows,
+        redirect: '/driver.html'
+      });
+    }
+
+    return res.status(401).json({ error: 'Hatalı e-posta, plaka, personel ID veya şifre girdiniz.' });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Giriş sırasında sunucu hatası oluştu.' });
+    console.error('Unified login error:', err);
+    res.status(500).json({ error: 'Giriş sırasında hata oluştu: ' + err.message });
   }
 });
 

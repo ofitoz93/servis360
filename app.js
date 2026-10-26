@@ -90,6 +90,43 @@ function showDashboardScreen() {
   document.getElementById('dashboardScreen').classList.add('active');
 }
 
+function setLoginType(type) {
+  const tabAdmin = document.getElementById('tabLoginAdmin');
+  const tabDriver = document.getElementById('tabLoginDriver');
+  const label = document.getElementById('labelLoginUsername');
+  const input = document.getElementById('inputEmail');
+  const hint = document.getElementById('hintLoginUsername');
+  const btn = document.getElementById('txtBtnLogin');
+
+  if (type === 'driver') {
+    tabAdmin.style.background = 'transparent';
+    tabAdmin.style.color = 'var(--text-muted)';
+    tabDriver.style.background = 'var(--accent-blue)';
+    tabDriver.style.color = '#fff';
+
+    label.innerText = 'Servis Plakası veya Personel ID';
+    input.placeholder = 'Örn: 41 ABC 41 veya PRS-1005';
+    hint.innerText = '* Şoför kokpitine doğrudan yönlendirileceksiniz.';
+    btn.innerText = 'Şoför / Personel Olarak Giriş Yap';
+  } else {
+    tabDriver.style.background = 'transparent';
+    tabDriver.style.color = 'var(--text-muted)';
+    tabAdmin.style.background = 'var(--accent-blue)';
+    tabAdmin.style.color = '#fff';
+
+    label.innerText = 'Yönetici / İK E-posta Adresi';
+    input.placeholder = 'Örn: admin@servis360.com';
+    hint.innerText = '* Süper admin veya firma yönetim paneline erişim sağlar.';
+    btn.innerText = 'Yönetici Olarak Giriş Yap';
+  }
+}
+
+function quickHomeLogin(username, password) {
+  document.getElementById('inputEmail').value = username;
+  document.getElementById('inputPassword').value = password;
+  document.getElementById('btnLoginSubmit').click();
+}
+
 async function handleLoginSubmit(e) {
   e.preventDefault();
   const email = document.getElementById('inputEmail').value.trim();
@@ -108,6 +145,20 @@ async function handleLoginSubmit(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Giriş yapılamadı.');
 
+    // Eğer Şoför veya Araç Girişiyse Doğrudan Şoför Kokpitine Yönlendir!
+    if (data.is_driver || data.redirect === '/driver.html') {
+      localStorage.setItem('servis360_driver_session', JSON.stringify({
+        shuttle: data.shuttle,
+        passengers: data.passengers
+      }));
+      showToast("🚗 Şoför Girişi Başarılı", `${data.shuttle.plate} kokpitine yönlendiriliyorsunuz...`, "success");
+      setTimeout(() => {
+        window.location.href = '/driver.html';
+      }, 700);
+      return;
+    }
+
+    // Yönetici / Firma Girişi
     state.currentUser = data.user;
     setupUserDashboard(data.user);
     showToast("Hoş Geldiniz", `${data.user.full_name} olarak giriş yapıldı.`, "success");
