@@ -345,6 +345,16 @@ app.post('/api/company/:companyId/routes', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Eğer bu araç için önceden tanımlanmış eski rota varsa temizle (Çakışma ve mükerrer kayıtları engelle)
+    if (shuttle_id) {
+      const oldRoutes = await client.query('SELECT id FROM routes WHERE company_id = $1 AND shuttle_id = $2', [companyId, shuttle_id]);
+      const oldIds = oldRoutes.rows.map(r => r.id);
+      if (oldIds.length > 0) {
+        await client.query('DELETE FROM stops WHERE route_id = ANY($1)', [oldIds]);
+        await client.query('DELETE FROM routes WHERE id = ANY($1)', [oldIds]);
+      }
+    }
+
     const routeRes = await client.query(`
       INSERT INTO routes 
       (company_id, shuttle_id, route_name, color, road_geometry, total_distance_km, total_duration_mins)
@@ -822,9 +832,23 @@ app.post('/api/shuttle/:shuttleId/passengers/:passengerId/status', async (req, r
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Servis360 Sunucusu http://localhost:${PORT} üzerinde PostgreSQL ile aktif!`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servis360 HTTP Sunucusu http://localhost:${PORT} (ve ağda http://192.168.3.18:${PORT}) üzerinde aktif!`);
   });
+
+  (async () => {
+    try {
+      const https = require('https');
+      const selfsigned = require('selfsigned');
+      const pems = await selfsigned.generate([{ name: 'commonName', value: '192.168.3.18' }], { days: 365 });
+      const HTTPS_PORT = 4174;
+      https.createServer({ key: pems.private, cert: pems.cert }, app).listen(HTTPS_PORT, '0.0.0.0', () => {
+        console.log(`🔒 Servis360 Güvenli HTTPS Sunucusu https://192.168.3.18:${HTTPS_PORT} üzerinde aktif (Mobil Bildirimler & PWA İçin)!`);
+      });
+    } catch (sslErr) {
+      console.warn('HTTPS başlatılamadı:', sslErr.message);
+    }
+  })();
 }
 
 module.exports = app;

@@ -371,14 +371,15 @@ function navigateTo(viewName) {
 // =========================================================================
 // 4. FABRİKA / OKUL LOKASYONUNU HARİTADAN SEÇME
 // =========================================================================
-function initWorkplacePickerMap() {
+function initWorkplacePickerMap(forcedLat, forcedLng, forcedRadius) {
   const container = document.getElementById('workplacePickerMap');
   if (!container) return;
 
-  const initialLat = parseFloat(document.getElementById('wpInputLat').value) || 41.1105;
-  const initialLng = parseFloat(document.getElementById('wpInputLng').value) || 29.0225;
-  const radius = parseInt(document.getElementById('wpInputGeofence').value) || 180;
-  const isSchool = state.activeCompanyData && state.activeCompanyData.company.operation_type === 'school';
+  const comp = state.activeCompanyData ? state.activeCompanyData.company : null;
+  const initialLat = forcedLat || (comp && comp.workplace_lat ? parseFloat(comp.workplace_lat) : parseFloat(document.getElementById('wpInputLat').value)) || 40.7241;
+  const initialLng = forcedLng || (comp && comp.workplace_lng ? parseFloat(comp.workplace_lng) : parseFloat(document.getElementById('wpInputLng').value)) || 29.4939;
+  const radius = forcedRadius || (comp && comp.geofence_radius_meters ? parseInt(comp.geofence_radius_meters) : parseInt(document.getElementById('wpInputGeofence').value)) || 180;
+  const isSchool = comp && comp.operation_type === 'school';
 
   if (!workplaceMap) {
     workplaceMap = L.map('workplacePickerMap', {
@@ -474,6 +475,9 @@ async function handleSaveWorkplace(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Kaydedilemedi');
 
+    if (state.activeCompanyData && data.company) {
+      state.activeCompanyData.company = { ...state.activeCompanyData.company, ...data.company };
+    }
     await loadCompanyData(state.activeCompanyId);
     showToast("Başarılı", "Lokasyon ve sanal çit veritabanına kaydedildi.", "success");
   } catch (err) {
@@ -489,8 +493,8 @@ function initRouteBuilderMap() {
   if (!container) return;
 
   const comp = state.activeCompanyData ? state.activeCompanyData.company : null;
-  const targetLat = comp ? comp.workplace_lat : 41.0500;
-  const targetLng = comp ? comp.workplace_lng : 29.0200;
+  const targetLat = comp && comp.workplace_lat ? parseFloat(comp.workplace_lat) : 40.7241;
+  const targetLng = comp && comp.workplace_lng ? parseFloat(comp.workplace_lng) : 29.4939;
   const isSchool = comp && comp.operation_type === 'school';
 
   if (!routeBuilderMap) {
@@ -517,6 +521,12 @@ function initRouteBuilderMap() {
     });
   } else {
     routeBuilderMap.invalidateSize();
+  }
+
+  // Eğer araç seçiliyse ve haritada henüz durak yoksa o aracın kayıtlı rotasını otomatik yükle
+  const shuttleSelect = document.getElementById('routeBuilderShuttleSelect');
+  if (shuttleSelect && shuttleSelect.value && routeBuilderStops.length === 0) {
+    onRouteBuilderShuttleChange(shuttleSelect.value);
   }
 }
 
@@ -652,16 +662,129 @@ async function removeStopFromBuilder(idx) {
 }
 
 function clearRouteBuilderStops() {
-  routeBuilderMarkers.forEach(m => routeBuilderMap.removeLayer(m));
+  routeBuilderMarkers.forEach(m => {
+    if (routeBuilderMap) routeBuilderMap.removeLayer(m);
+  });
   routeBuilderMarkers = [];
   routeBuilderStops = [];
-  if (routeBuilderPolyline) {
+  if (routeBuilderPolyline && routeBuilderMap) {
     routeBuilderMap.removeLayer(routeBuilderPolyline);
     routeBuilderPolyline = null;
   }
   calculatedRoadGeometry = [];
-  document.getElementById('routeCalculationSummaryBox').style.display = 'none';
+  const summaryBox = document.getElementById('routeCalculationSummaryBox');
+  if (summaryBox) summaryBox.style.display = 'none';
   renderRouteBuilderStopsList();
+}
+
+// Araç Seçildiğinde O Araca Ait Mevcut Rotayı Haritaya Otomatik Yükle
+function onRouteBuilderShuttleChange(shuttleId) {
+  if (!shuttleId) {
+    clearRouteBuilderStops();
+    return;
+  }
+  const sId = parseInt(shuttleId);
+  const data = state.activeCompanyData;
+  if (!data || !data.routes) return;
+
+  // Bu araca ait en güncel rotayı bul
+  const matchedRoute = [...data.routes].reverse().find(r => r.shuttle_id === sId);
+  if (matchedRoute) {
+    loadRouteIntoBuilder(matchedRoute);
+  } else {
+    clearRouteBuilderStops();
+    const matchedShuttle = (data.shuttles || []).find(s => s.id === sId);
+    document.getElementById('routeBuilderNameInput').value = `${matchedShuttle ? matchedShuttle.plate : 'Servis'} Güzergahı`;
+  }
+}
+
+// Kayıtlı Rotayı Rota Planlayıcı Haritasına Yükle
+function loadRouteIntoBuilder(route) {
+  clearRouteBuilderStops();
+
+  const data = state.activeCompanyData;
+  if (!data) return;
+
+  // Bu rotaya ait durakları bul ve sırala
+  const stops = (data.stops || []).filter(st => st.route_id === route.id).sort((a,b) => (a.stop_order || 0) - (b.stop_order || 0));
+
+  const selectEl = document.getElementById('routeBuilderShuttleSelect');
+  if (selectEl && route.shuttle_id) selectEl.value = route.shuttle_id;
+
+  const nameInput = document.getElementById('routeBuilderNameInput');
+  if (nameInput) nameInput.value = route.route_name || 'Servis Güzergahı';
+
+  stops.forEach((st, idx) => {
+    const stopObj = {
+      id: st.id,
+      order: st.stop_order || (idx + 1),
+      stop_name: st.stop_name,
+      lat: parseFloat(st.lat),
+      lng: parseFloat(st.lng),
+      eta_time: st.eta_time || '07:30'
+    };
+    routeBuilderStops.push(stopObj);
+
+    if (routeBuilderMap) {
+      const stopIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `<div class="stop-marker-icon">${stopObj.order}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+      const marker = L.marker([stopObj.lat, stopObj.lng], { icon: stopIcon })
+        .bindPopup(`<b>${stopObj.stop_name}</b><br>Biniş: ${stopObj.eta_time}`)
+        .addTo(routeBuilderMap);
+      routeBuilderMarkers.push(marker);
+    }
+  });
+
+  // Yol geometrisini haritada çiz
+  if (route.road_geometry && Array.isArray(route.road_geometry) && route.road_geometry.length > 0 && routeBuilderMap) {
+    calculatedRoadGeometry = route.road_geometry;
+    calculatedDistanceKm = route.total_distance_km || 0;
+    calculatedDurationMins = route.total_duration_mins || 0;
+
+    routeBuilderPolyline = L.polyline(calculatedRoadGeometry, {
+      color: '#3b82f6',
+      weight: 5,
+      opacity: 0.85,
+      lineJoin: 'round'
+    }).addTo(routeBuilderMap);
+
+    try {
+      routeBuilderMap.fitBounds(routeBuilderPolyline.getBounds(), { padding: [40, 40] });
+    } catch (e) {}
+
+    const statsBox = document.getElementById('routeCalculationSummaryBox');
+    const statsEl = document.getElementById('routeCalcStats');
+    if (statsBox && statsEl) {
+      statsEl.innerText = `${calculatedDistanceKm} km, ~${calculatedDurationMins} dakika`;
+      statsBox.style.display = 'block';
+    }
+  } else if (routeBuilderMarkers.length > 0 && routeBuilderMap) {
+    const group = L.featureGroup(routeBuilderMarkers);
+    try {
+      routeBuilderMap.fitBounds(group.getBounds(), { padding: [40, 40] });
+    } catch (e) {}
+  }
+
+  renderRouteBuilderStopsList();
+}
+
+function loadSavedRouteToBuilder(routeId) {
+  const data = state.activeCompanyData;
+  if (!data || !data.routes) return;
+  const r = data.routes.find(x => x.id === routeId);
+  if (!r) return;
+
+  navigateTo('companyRoutes');
+  setTimeout(() => {
+    loadRouteIntoBuilder(r);
+    showToast("🗺️ Rota Yüklendi", `${r.route_name} haritada açıldı.`, "info");
+    const builderCard = document.getElementById('viewCompanyRoutes');
+    if (builderCard) builderCard.scrollIntoView({ behavior: 'smooth' });
+  }, 300);
 }
 
 // Yollar Üzerinden Çizilen Rotayı Veritabanına Kaydet
@@ -703,7 +826,6 @@ async function saveRouteFromBuilder() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Rota kaydedilemedi.');
 
-    clearRouteBuilderStops();
     await loadCompanyData(state.activeCompanyId);
     showToast("🎉 Gerçek Yol Rotası Kaydedildi", `${payload.route_name} (${calculatedDistanceKm} km) veritabanına işlendi.`, "success");
   } catch (err) {
@@ -1413,9 +1535,14 @@ async function loadCompanyData(companyId) {
       // Fabrika/Okul verileri
       const comp = data.company;
       document.getElementById('wpInputName').value = comp.workplace_name || '';
-      document.getElementById('wpInputLat').value = comp.workplace_lat || 41.1105;
-      document.getElementById('wpInputLng').value = comp.workplace_lng || 29.0225;
+      document.getElementById('wpInputLat').value = comp.workplace_lat || 40.7241;
+      document.getElementById('wpInputLng').value = comp.workplace_lng || 29.4939;
       document.getElementById('wpInputGeofence').value = comp.geofence_radius_meters || 180;
+
+      // Fabrika/Okul haritasını veritabanındaki gerçek koordinatlara odakla
+      if (comp.workplace_lat && comp.workplace_lng) {
+        initWorkplacePickerMap(parseFloat(comp.workplace_lat), parseFloat(comp.workplace_lng), parseInt(comp.geofence_radius_meters) || 180);
+      }
 
       // Servisler
       renderCompanyShuttles(data.shuttles);
@@ -1426,9 +1553,16 @@ async function loadCompanyData(companyId) {
         if (data.shuttles.length === 0) {
           routeShuttleSelect.innerHTML = `<option value="">Önce Servis Araçları menüsünden araç ekleyin</option>`;
         } else {
+          const prevVal = routeShuttleSelect.value;
           routeShuttleSelect.innerHTML = data.shuttles.map(s => `
             <option value="${s.id}">${s.plate} - ${s.driver_name || 'Şoför'} (${s.capacity} Kişilik)</option>
           `).join('');
+
+          const targetShuttleId = prevVal ? parseInt(prevVal) : data.shuttles[0].id;
+          routeShuttleSelect.value = targetShuttleId;
+          setTimeout(() => {
+            onRouteBuilderShuttleChange(targetShuttleId);
+          }, 350);
         }
       }
 
@@ -1590,7 +1724,8 @@ function renderCompanySavedRoutes(routes, stops) {
           </div>
           <div style="display:flex; gap:0.5rem; align-items:center;">
             <span class="badge-tag badge-portal">${routeStops.length} Durak</span>
-            <button class="btn-action secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; color:#fda4af;" onclick="deleteRoute(${r.id})">Sil</button>
+            <button class="btn-action primary" style="padding:0.25rem 0.65rem; font-size:0.725rem;" onclick="loadSavedRouteToBuilder(${r.id})">🗺️ Haritada Yükle / Düzenle</button>
+            <button class="btn-action secondary" style="padding:0.25rem 0.5rem; font-size:0.725rem; color:#fda4af;" onclick="deleteRoute(${r.id})">Sil</button>
           </div>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">

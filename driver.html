@@ -444,6 +444,36 @@
          ========================================================================= -->
     <div id="sectionDriverCockpit" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
       
+      <!-- 0. Mobil Bildirim & HTTPS Bağlantı Durumu Kartı -->
+      <div class="card" id="cardNotifDiagnostic" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(59, 130, 246, 0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <div style="font-size: 0.85rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
+            <span>🔔</span> <span>Mobil Bildirim & Sistem Durumu</span>
+          </div>
+          <span id="badgeNotifPerm" class="status-pill" style="font-size: 0.7rem; color: #38bdf8;">Kontrol Ediliyor...</span>
+        </div>
+
+        <!-- HTTP Uyarısı (Eğer HTTPS değilse ve localhost değilse görünür) -->
+        <div id="boxHttpsNotice" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem; font-size: 0.775rem; color: #fde68a; line-height: 1.45;">
+          <div style="font-weight: 800; margin-bottom: 0.25rem;">⚠️ DİKKAT: HTTP (Güvensiz Yerel Ağ) Bağlantısı</div>
+          <div>Android Chrome ve iOS Safari, telefonlarda <b>HTTP IP</b> üzerinden bildirim göndermeyi güvenlik sebebiyle engeller. Bildirimlerin ve butonların telefonunuza düşmesi için <b>Güvenli HTTPS</b> adresinden açmanız gerekir.</div>
+          <div style="margin-top: 0.5rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">
+            <a id="linkSwitchHttps" href="#" class="btn-board waiting" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; text-decoration: none; color: #fff; background: var(--accent-blue); border: none; font-weight: 700;">
+              🔒 Güvenli HTTPS Adresine Geç (Port 4174) ➔
+            </a>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-board waiting" onclick="testMobileNotification()" style="flex: 1; padding: 0.6rem; font-size: 0.8rem; background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); color: #93c5fd; font-weight: 700;">
+            📲 Telefonuma Bildirim Gönder (Test Et)
+          </button>
+          <button type="button" class="btn-board waiting" onclick="reinstallPwaNotice()" style="padding: 0.6rem 0.8rem; font-size: 0.8rem; color: #cbd5e1;">
+            ℹ️ Kurulum İpuçları
+          </button>
+        </div>
+      </div>
+
       <!-- 1. Sefer İstikameti Seçici (Sabah Toplama vs Akşam Dönüş Dağıtımı) -->
       <div style="display: flex; gap: 0.5rem; background: rgba(255,255,255,0.04); padding: 0.35rem; border-radius: 12px; border: 1px solid var(--border-color);">
         <button type="button" class="btn-tab active" id="btnTripMorning" onclick="switchTripMode('morning')" style="flex: 1; padding: 0.65rem; font-size: 0.8rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.2s;">
@@ -735,6 +765,89 @@
       }
     }
 
+    function updateNotificationUiStatus() {
+      const badge = document.getElementById('badgeNotifPerm');
+      const boxHttps = document.getElementById('boxHttpsNotice');
+      const linkHttps = document.getElementById('linkSwitchHttps');
+      
+      const isHttps = location.protocol === 'https:';
+      const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      const isSecure = window.isSecureContext;
+
+      if (!isHttps && !isLocalhost) {
+        if (boxHttps) boxHttps.style.display = 'block';
+        if (linkHttps) linkHttps.href = `https://${location.hostname}:4174/driver.html`;
+      } else {
+        if (boxHttps) boxHttps.style.display = 'none';
+      }
+
+      if (!('Notification' in window)) {
+        if (badge) {
+          badge.innerText = '🚫 Desteklenmiyor';
+          badge.style.color = '#f87171';
+        }
+        return;
+      }
+
+      if (badge) {
+        if (Notification.permission === 'granted') {
+          badge.innerText = isSecure ? '🟢 Bildirimler Aktif' : '⚠️ İzin Var (HTTPS Gerekli)';
+          badge.style.color = isSecure ? '#34d399' : '#f59e0b';
+        } else if (Notification.permission === 'denied') {
+          badge.innerText = '🔴 Engellendi (İzin Verin)';
+          badge.style.color = '#f87171';
+        } else {
+          badge.innerText = '🟡 İzin Bekliyor';
+          badge.style.color = '#fbbf24';
+        }
+      }
+    }
+
+    async function testMobileNotification() {
+      playSuccessChime();
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+      if (!('Notification' in window)) {
+        alert("Tarayıcınız sistem bildirimlerini desteklemiyor.");
+        return;
+      }
+
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        updateNotificationUiStatus();
+        if (perm !== 'granted') {
+          alert("Bildirim izni verilmedi. Bildirimlerin telefonunuza gelebilmesi için tarayıcının veya Android Ayarları > Uygulamalar > Chrome/Servis360 bildirimlerine izin verilmelidir.");
+          return;
+        }
+      }
+
+      updateNotificationUiStatus();
+
+      await sendMobileNotification(
+        "✅ Servis360 Bildirim Testi",
+        "Mobil bildirimler ve [▶️ Devam Et] / [⏹️ Canlı Konumu Durdur] butonları telefonunuzda aktif çalışıyor!",
+        [
+          { action: 'continue', title: '▶️ Devam Et' },
+          { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
+        ],
+        "test-notification"
+      );
+
+      alert("📲 Test bildirimi telefonunuza gönderildi! Lütfen telefonunuzun üst bildirim çubuğunu aşağı kaydırıp kontrol edin.");
+    }
+
+    function reinstallPwaNotice() {
+      alert(
+        "📲 Uygulama ve Bildirim İpuçları:\n\n" +
+        "1. UYGULAMAYI YENİDEN YÜKLEME:\n" +
+        "Eğer uygulamayı daha önce ana ekrana yüklediyseniz, eski sürüm önbellekte kalmış olabilir. Eski ikonu ana ekrandan silip, bu adresi açtıktan sonra tekrar 'Ana Ekrana Ekle' yapmanız önerilir.\n\n" +
+        "2. ANDROID BİLDİRİM İZNİ:\n" +
+        "Telefonunuzun Ayarlar > Uygulamalar > Chrome (veya Servis360) > Bildirimler menüsünün 'Açık' olduğundan emin olun.\n\n" +
+        "3. GÜVENLİ HTTPS BAĞLANTISI:\n" +
+        "Telefonunuzdan bağlanırken https://192.168.3.18:4174 adresini kullanın. Açılışta 'Gelişmiş > Siteye İlerle'ye dokunun. Böylece Google Chrome mobil bildirimleri 100% aktif hale getirecektir."
+      );
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       // Service Worker Kaydı (Mobil Bildirimler ve PWA Eylemleri)
       if ('serviceWorker' in navigator) {
@@ -742,9 +855,11 @@
           .then((reg) => {
             swRegistration = reg;
             console.log('✅ ServiceWorker hazır, scope:', reg.scope);
+            updateNotificationUiStatus();
           })
           .catch((err) => {
             console.warn('ServiceWorker kayıt hatası:', err);
+            updateNotificationUiStatus();
           });
 
         navigator.serviceWorker.addEventListener('message', (event) => {
@@ -756,6 +871,8 @@
           }
         });
       }
+
+      updateNotificationUiStatus();
 
       // Oturum kontrolü
       const savedSession = localStorage.getItem('servis360_driver_session');
@@ -863,6 +980,7 @@
       initDriverMap();
       checkAndEnforceLocationPermission();
       startAutoShiftClockCheck();
+      updateNotificationUiStatus();
     }
 
     // Sunucudan en güncel servis, rota ve durak verilerini çek
