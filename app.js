@@ -1080,8 +1080,25 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
     iconAnchor: [19, 19]
   });
 
+  const matchedRouteObj = data.routes.find(r => r.id === targetRouteId);
+  const routeDistStr = matchedRouteObj && matchedRouteObj.total_distance_km ? ` (~${matchedRouteObj.total_distance_km} km)` : '';
+
   liveMapShuttleMarker = L.marker(shuttleStart, { icon: shuttleIcon })
-    .bindPopup(`<b>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</b><br>Şoför: ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'}<br>Durum: ${isRunning ? '🟢 Canlı GPS Yayını Yapıyor' : 'Beklemede'}<br>İstikamet: ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}`)
+    .bindPopup(`
+      <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:200px;">
+        <div style="font-size:13px; font-weight:800; color:#fff; display:flex; align-items:center; gap:6px;">
+          <span>🚐</span> <span>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</span>
+          ${isRunning ? '<span style="font-size:10px; color:#34d399; background:rgba(16,185,129,0.2); padding:1px 6px; border-radius:4px; font-weight:700;">CANLI</span>' : ''}
+        </div>
+        <div style="font-size:11px; color:#cbd5e1; margin-top:5px;"><b>Şoför:</b> ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'} (${matchedShuttle ? (matchedShuttle.driver_phone || '-') : ''})</div>
+        <div style="font-size:11px; color:#cbd5e1;"><b>Rota:</b> ${matchedRouteObj ? matchedRouteObj.route_name : 'Aktif Rota'}${routeDistStr}</div>
+        <div style="font-size:11px; color:#cbd5e1;"><b>Durak Sayısı:</b> ${routeStops.length} Durak</div>
+        <div style="font-size:11px; color:#cbd5e1;"><b>İstikamet:</b> ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}</div>
+        <button type="button" class="btn-action secondary" onclick="showShuttleRouteOnLiveMap('all')" style="width:100%; margin-top:8px; padding:6px; font-size:11px; justify-content:center; cursor:pointer;">
+          🌐 Tüm Filo Görünümüne Dön
+        </button>
+      </div>
+    `)
     .addTo(liveMap);
 
   setTimeout(() => {
@@ -1276,7 +1293,7 @@ function startRealGpsPolling() {
             if (!allCompanyShuttleMarkers[s.id]) {
               const otherIcon = L.divIcon({
                 className: 'custom-pin',
-                html: `<div class="shuttle-marker-icon ${isOtherRunning ? 'active-pulse' : ''}" style="${isOtherRunning ? 'border: 2px solid #10b981; background: #064e3b;' : 'background: #1e293b; opacity:0.95;'}">
+                html: `<div class="shuttle-marker-icon ${isOtherRunning ? 'active-pulse' : ''}" style="${isOtherRunning ? 'border: 2px solid #10b981; background: #064e3b; cursor:pointer;' : 'background: #1e293b; opacity:0.95; cursor:pointer;'}">
                   🚐
                   <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 800; background: #0f172a; padding: 1px 5px; border-radius: 5px; border: 1px solid ${statusColor}; color: ${isOtherRunning ? '#34d399' : '#cbd5e1'}; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
                     ${s.plate} ${isOtherRunning ? '🟢' : ''}
@@ -1286,9 +1303,32 @@ function startRealGpsPolling() {
                 iconAnchor: [17, 17]
               });
 
-              allCompanyShuttleMarkers[s.id] = L.marker(latLng, { icon: otherIcon })
-                .bindPopup(`<b>🚐 ${s.plate}</b><br><b>Şoför:</b> ${s.driver_name || 'Şoför'}<br><b>Durum:</b> ${isOtherRunning ? '🟢 Canlı Yayında' : (isArrived ? '🏁 Tamamlandı' : 'Beklemede')}<br><b>Tel:</b> ${s.driver_phone || '-'}<br><b>Dönüş Saati:</b> ${s.return_time || '-'}`)
+              const matchedRoute = (state.activeCompanyData?.routes || []).find(r => r.shuttle_id === s.id);
+              const routeName = matchedRoute ? matchedRoute.route_name : 'Kayıtlı Rota';
+
+              const marker = L.marker(latLng, { icon: otherIcon })
+                .bindPopup(`
+                  <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:190px;">
+                    <div style="font-size:13px; font-weight:800; color:#fff; display:flex; align-items:center; gap:6px;">
+                      <span>🚐</span> <span>${s.plate}</span>
+                      ${isOtherRunning ? '<span style="font-size:10px; color:#34d399; background:rgba(16,185,129,0.2); padding:1px 6px; border-radius:4px; font-weight:700;">CANLI</span>' : ''}
+                    </div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;"><b>Şoför:</b> ${s.driver_name || 'Şoför'} (${s.driver_phone || '-'})</div>
+                    <div style="font-size:11px; color:#94a3b8;"><b>Rota:</b> ${routeName}</div>
+                    <div style="font-size:11px; color:#94a3b8;"><b>Saat:</b> ${s.shift_start_time || '07:15'} - ${s.return_time || '16:45'}</div>
+                    <button type="button" class="btn-action primary" onclick="showShuttleRouteOnLiveMap(${s.id})" style="width:100%; margin-top:8px; padding:6px; font-size:11px; justify-content:center; cursor:pointer;">
+                      🗺️ Rotasını Haritada Göster
+                    </button>
+                  </div>
+                `)
                 .addTo(liveMap);
+
+              // ARACIN ÜSTÜNE TIKLAYINCA ROTASINI VE DURAKLARINI GÖSTER
+              marker.on('click', () => {
+                showShuttleRouteOnLiveMap(s.id);
+              });
+
+              allCompanyShuttleMarkers[s.id] = marker;
             } else {
               allCompanyShuttleMarkers[s.id].setLatLng(latLng);
             }
@@ -1354,21 +1394,70 @@ function renderFleetLiveCards(shuttles) {
           </div>
         </div>
 
-        <div style="margin-top: 0.75rem;">
+        <div style="margin-top: 0.75rem; display: flex; gap: 0.4rem;">
+          <button type="button" class="btn-action primary" onclick="showShuttleRouteOnLiveMap(${s.id})" style="flex: 1; padding: 0.45rem 0.5rem; font-size: 0.75rem; justify-content: center;">
+            🗺️ Rotayı & Canlı Takibi Aç
+          </button>
           ${hasCoords ? `
-            <button type="button" class="btn-action primary" onclick="focusOnShuttleMarker(${s.id}, ${s.last_lat}, ${s.last_lng})" style="width: 100%; padding: 0.4rem 0.5rem; font-size: 0.75rem; justify-content: center;">
-              🔍 Haritada Odaklan
+            <button type="button" class="btn-action secondary" onclick="focusOnShuttleMarker(${s.id}, ${s.last_lat}, ${s.last_lng})" style="padding: 0.45rem 0.6rem; font-size: 0.75rem; justify-content: center;" title="Araca Yakınlaş">
+              🔍
             </button>
-          ` : `
-            <button type="button" class="btn-action secondary" disabled style="width: 100%; padding: 0.4rem 0.5rem; font-size: 0.75rem; justify-content: center; opacity: 0.5;">
-              GPS Sinyali Bekleniyor
-            </button>
-          `}
+          ` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
+
+// Canlı Takipte Aracın Üstüne Tıklayınca Rotasını Yükleme ve Gösterme
+window.showShuttleRouteOnLiveMap = function(shuttleId) {
+  if (!state.activeCompanyData || !liveMap) return;
+  const data = state.activeCompanyData;
+
+  if (shuttleId === 'all') {
+    state.activeRouteId = 'all';
+    const routeSelect = document.getElementById('liveMapRouteSelect');
+    if (routeSelect) routeSelect.value = 'all';
+    initLiveMapWithCompanyRoutes(data, 'all');
+    showToast("🌐 Filo Genel Bakış", "Tüm araçlar haritada gösteriliyor.", "info");
+    return;
+  }
+
+  const sId = parseInt(shuttleId);
+  const matchedShuttle = (data.shuttles || []).find(s => s.id === sId);
+  const matchedRoute = (data.routes || []).find(r => r.shuttle_id === sId) || (data.routes || [])[0];
+
+  if (!matchedRoute) {
+    showToast("Rota Bulunamadı", `${matchedShuttle ? matchedShuttle.plate : 'Bu servis'} için kayıtlı bir güzergah bulunamadı.`, "warning");
+    return;
+  }
+
+  // Dropdown'u güncelle
+  state.activeRouteId = matchedRoute.id;
+  const routeSelect = document.getElementById('liveMapRouteSelect');
+  if (routeSelect) {
+    routeSelect.value = matchedRoute.id;
+  }
+
+  // Haritayı seçili rotayla çiz
+  initLiveMapWithCompanyRoutes(data, matchedRoute.id);
+
+  // Araca odaklan ve popup aç
+  if (matchedShuttle && matchedShuttle.last_lat && matchedShuttle.last_lng) {
+    const latLng = [parseFloat(matchedShuttle.last_lat), parseFloat(matchedShuttle.last_lng)];
+    setTimeout(() => {
+      if (liveMapShuttleMarker) {
+        liveMapShuttleMarker.openPopup();
+      }
+    }, 350);
+  }
+
+  showToast(
+    `🗺️ ${matchedShuttle ? matchedShuttle.plate : 'Araç'} Rotası Yüklendi`,
+    `${matchedRoute.route_name} güzergahı ve durakları harita üzerinde gösteriliyor.`,
+    "success"
+  );
+};
 
 window.focusOnShuttleMarker = function(shuttleId, lat, lng) {
   if (!liveMap) return;

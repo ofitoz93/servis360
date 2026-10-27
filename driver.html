@@ -840,17 +840,17 @@
           </div>
         </div>
 
-        <!-- Otomatik Bildirim & Başlatma Durumu & Simülasyon -->
+        <!-- Otomatik Sefer Başlatma Durumu & Hızlı Başlat -->
         <div style="margin-top: 0.75rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 0.75rem;">
           <div style="font-size: 0.75rem; color: #34d399; font-weight: 600; margin-bottom: 0.5rem;" id="txtAutoAlarmHint">
             ⏰ Sabah (<span id="txtHintMorning">07:15</span>) ve Akşam Dönüş (<span id="txtHintReturn">16:45</span>) saatinde GPS otomatik başlar.
           </div>
           <div style="display: flex; gap: 0.4rem;">
-            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem;" onclick="triggerSimulatedAutoStart('morning')">
-              ⚡ Sabahı Simüle Et (<span id="btnSimMornTime">07:15</span>)
+            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem;" onclick="triggerAutoStartTrip('morning')">
+              🌅 Sabah Seferini Başlat (<span id="btnSimMornTime">07:15</span>)
             </button>
-            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem; color: #60a5fa; border-color: rgba(96,165,250,0.4);" onclick="triggerSimulatedAutoStart('evening')">
-              ⚡ Dönüşü Simüle Et (<span id="btnSimRetTime">16:45</span>)
+            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem; color: #60a5fa; border-color: rgba(96,165,250,0.4);" onclick="triggerAutoStartTrip('evening')">
+              🌇 Akşam Seferini Başlat (<span id="btnSimRetTime">16:45</span>)
             </button>
           </div>
         </div>
@@ -1487,6 +1487,7 @@
 
       renderPassengerList();
       updateMapDestinationCircle();
+      drawRouteOnDriverMap();
     }
 
     function renderPassengerList() {
@@ -1782,7 +1783,7 @@
     }
 
     // Sefer Otomatik / Manuel Alarm ile Başlatma
-    function triggerSimulatedAutoStart(mode = 'morning') {
+    function triggerAutoStartTrip(mode = 'morning') {
       if (isTracking) stopTracking();
 
       switchTripMode(mode);
@@ -1805,6 +1806,51 @@
 
       startTracking();
     }
+    const triggerSimulatedAutoStart = triggerAutoStartTrip;
+
+    let driverRoutePolyline = null;
+    let driverStopMarkers = [];
+
+    function drawRouteOnDriverMap() {
+      if (!driverMap) return;
+
+      if (driverRoutePolyline) {
+        driverMap.removeLayer(driverRoutePolyline);
+        driverRoutePolyline = null;
+      }
+      driverStopMarkers.forEach(m => driverMap.removeLayer(m));
+      driverStopMarkers = [];
+
+      // Durakları ekle
+      if (activeRouteStops && activeRouteStops.length > 0) {
+        activeRouteStops.forEach(st => {
+          if (!st.lat || !st.lng) return;
+          const sIcon = L.divIcon({
+            className: 'custom-pin',
+            html: `<div style="background:#0f172a; border:2px solid #3b82f6; color:#93c5fd; width:22px; height:22px; border-radius:50%; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.6);">${st.stop_order || '•'}</div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+          });
+          const m = L.marker([st.lat, st.lng], { icon: sIcon })
+            .bindPopup(`<b>${st.stop_name || 'Durak'}</b><br>Saat: ${st.eta_time || '-'}`)
+            .addTo(driverMap);
+          driverStopMarkers.push(m);
+        });
+      }
+
+      // Rota çizgisi (OSRM Yol Geometrisi)
+      if (activeRoute && activeRoute.road_geometry && Array.isArray(activeRoute.road_geometry) && activeRoute.road_geometry.length > 1) {
+        const pts = currentTripType === 'evening' 
+          ? [...activeRoute.road_geometry].reverse() 
+          : [...activeRoute.road_geometry];
+
+        driverRoutePolyline = L.polyline(pts, {
+          color: currentTripType === 'evening' ? '#0ea5e9' : '#3b82f6',
+          weight: 4,
+          opacity: 0.85
+        }).addTo(driverMap);
+      }
+    }
 
     function initDriverMap() {
       const container = document.getElementById('driverMap');
@@ -1826,7 +1872,7 @@
         driverMap.invalidateSize();
       }
 
-      // Eğer aracın son koordinatları varsa araç işaretçisini haritaya hemen yerleştir!
+      // Eğer aracın son koordinatları varsa araç işaretçisini haritaya yerleştir!
       if (activeShuttle.last_lat && activeShuttle.last_lng) {
         const sLat = parseFloat(activeShuttle.last_lat);
         const sLng = parseFloat(activeShuttle.last_lng);
@@ -1847,6 +1893,7 @@
       }
 
       updateMapDestinationCircle();
+      drawRouteOnDriverMap();
     }
 
     function updateMapDestinationCircle() {
@@ -1979,21 +2026,46 @@
         );
       }
 
-      if (isSimulated || !navigator.geolocation) {
+      // Önceki simülasyonları kesinlikle temizle (Kullanıcı kendi gerçek GPS konumuyla takip edilir)
+      if (simInterval) {
+        clearInterval(simInterval);
+        simInterval = null;
+      }
+
+      if (isSimulated) {
         startSimulatedGpsStream();
         return;
       }
 
-      const options = {
+      if (!navigator.geolocation) {
+        alert('Cihazınızda GPS donanımı veya konum servisi bulunamadı.');
+        return;
+      }
+
+      const geoOptions = {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        timeout: 20000,
+        maximumAge: 3000
       };
 
-      watchId = navigator.geolocation.watchPosition(handleGpsSuccess, (err) => {
-        console.warn('GPS donanımı bekleniyor veya simülasyona geçiliyor:', err);
-        startSimulatedGpsStream();
-      }, options);
+      // 1. Telefonun o anki gerçek GPS konumunu HEMEN al (fabrika yanıysa doğrudan fabrikayı alsın!)
+      navigator.geolocation.getCurrentPosition(
+        handleGpsSuccess,
+        (err) => {
+          console.warn('İlk GPS okuma uyarısı:', err);
+          document.getElementById('metricAccuracy').innerHTML = '±-- <span style="font-size:0.75rem;">Uydu Aranıyor</span>';
+        },
+        geoOptions
+      );
+
+      // 2. Hareket ettikçe telefonun gerçek GPS koordinatlarını sürekli yayınla (ASLA simülasyona veya 1. durağa zıplamaz!)
+      watchId = navigator.geolocation.watchPosition(
+        handleGpsSuccess,
+        (err) => {
+          console.warn('GPS akış uyarısı:', err);
+        },
+        geoOptions
+      );
     }
 
     function stopTracking() {
@@ -2175,34 +2247,32 @@
     }
 
     async function handleGpsSuccess(pos) {
+      // Gerçek telefon GPS koordinatı geldiği an simülasyonu sonlandır!
+      if (simInterval) {
+        clearInterval(simInterval);
+        simInterval = null;
+      }
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-      const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 38;
-      const accuracy = Math.round(pos.coords.accuracy) || 10;
+      const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+      const accuracy = Math.round(pos.coords.accuracy) || 8;
       await sendGpsLocation(lat, lng, speedKmH, pos.coords.heading || 0, accuracy);
     }
 
-    // Masaüstü veya Test Sırasında Otomatik Yol Simülasyonu
+    // Otomatik Yol Simülasyonu (Gerçek sahada kesinlikle devre dışıdır - sadece ?force_demo=1 ile açılabilir)
     function startSimulatedGpsStream() {
       if (simInterval) clearInterval(simInterval);
+      if (!window.location.search.includes('force_demo=1')) {
+        console.log('[GPS] Gerçek cihaz GPS modu aktif. Otomatik demo sürüşü devre dışı.');
+        return;
+      }
 
-      // Rotanın koordinatlarını belirle
+      // Sadece geliştirici açıkça ?force_demo=1 derse çalışır
       let routePoints = [];
       if (activeRoute && activeRoute.road_geometry && Array.isArray(activeRoute.road_geometry) && activeRoute.road_geometry.length > 0) {
         routePoints = currentTripType === 'evening'
-          ? [...activeRoute.road_geometry].reverse() // Akşam: Fabrikadan sabahki ilk durağa doğru
-          : [...activeRoute.road_geometry]; // Sabah: İlk duraktan fabrikaya doğru
-      } else {
-        // Yedek koordinatlar (Dilovası - Gebze hattı)
-        const samplePoints = [
-          [40.72318, 29.493785],
-          [40.73012, 29.482011],
-          [40.74230, 29.465100],
-          [40.75540, 29.442100],
-          [40.76890, 29.421500],
-          [40.78120, 29.408200]
-        ];
-        routePoints = currentTripType === 'evening' ? samplePoints : [...samplePoints].reverse();
+          ? [...activeRoute.road_geometry].reverse()
+          : [...activeRoute.road_geometry];
       }
 
       let stepIndex = 0;
