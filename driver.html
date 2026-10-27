@@ -363,10 +363,308 @@
       max-width: 400px;
       width: 100%;
     }
+
+    /* =========================================================================
+       CANLI YAYIN AKTİF BANNERI (KOKPİT ÜSTÜ GLOWING CANLI YAYIN ÇUBUĞU)
+       ========================================================================= */
+    .live-broadcast-banner {
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 2px solid #10b981;
+      border-radius: 16px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.4), 0 10px 25px rgba(0,0,0,0.6);
+      animation: pulseLiveBorder 2.5s infinite;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    @keyframes pulseLiveBorder {
+      0%, 100% {
+        border-color: #10b981;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+      }
+      50% {
+        border-color: #34d399;
+        box-shadow: 0 0 40px rgba(16, 185, 129, 0.65);
+      }
+    }
+
+    .live-banner-radar {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      position: relative;
+    }
+
+    .radar-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 14px #10b981;
+      position: relative;
+      z-index: 2;
+      animation: radarBlink 1s infinite;
+    }
+
+    .radar-ring {
+      position: absolute;
+      left: -2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #34d399;
+      animation: radarWave 1.6s infinite;
+    }
+
+    @keyframes radarBlink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    @keyframes radarWave {
+      0% { transform: translateY(-50%) scale(0.6); opacity: 1; }
+      100% { transform: translateY(-50%) scale(2.4); opacity: 0; }
+    }
+
+    .live-banner-headline {
+      font-size: 0.9rem;
+      font-weight: 900;
+      color: #34d399;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .live-banner-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.5rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .live-banner-plate {
+      font-family: 'Fira Code', monospace;
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .live-banner-timer {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #a7f3d0;
+    }
+
+    .live-banner-sub {
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .live-banner-quick-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.2rem;
+    }
+
+    .btn-live-quick {
+      flex: 1;
+      padding: 0.65rem 0.6rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-live-quick.stop {
+      background: rgba(244, 63, 94, 0.25);
+      color: #fecdd3;
+      border: 1px solid rgba(244, 63, 94, 0.5);
+    }
+
+    .btn-live-quick.stop:active {
+      transform: scale(0.97);
+    }
+
+    .btn-live-quick.finish {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+    }
+
+    .btn-live-quick.finish:active {
+      transform: scale(0.97);
+    }
+
+    /* =========================================================================
+       ANLIK UYGULAMA İÇİ FLOATING BİLDİRİM (HEADS-UP ALERT TOAST)
+       ========================================================================= */
+    .in-app-toast {
+      position: fixed;
+      top: 14px;
+      left: 12px;
+      right: 12px;
+      max-width: 500px;
+      margin: 0 auto;
+      z-index: 100000;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.97);
+      border: 2px solid #3b82f6;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 30px rgba(59, 130, 246, 0.45);
+      backdrop-filter: blur(16px);
+      overflow: hidden;
+    }
+
+    @keyframes slideDownToast {
+      from { transform: translateY(-130%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes slideUpToast {
+      from { transform: translateY(0); opacity: 1; }
+      to { transform: translateY(-130%); opacity: 0; }
+    }
+
+    .in-app-toast-content {
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .in-app-toast-header {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .in-app-toast-icon {
+      font-size: 1.6rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(59, 130, 246, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .in-app-toast-text {
+      flex: 1;
+    }
+
+    .in-app-toast-title {
+      font-size: 0.975rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.25;
+    }
+
+    .in-app-toast-time {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-top: 0.15rem;
+    }
+
+    .in-app-toast-close {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 0.35rem;
+    }
+
+    .in-app-toast-body {
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      line-height: 1.45;
+    }
+
+    .in-app-toast-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+    }
+
+    .toast-btn {
+      flex: 1;
+      padding: 0.7rem 0.8rem;
+      border-radius: 10px;
+      font-size: 0.825rem;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .toast-btn-continue {
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+
+    .toast-btn-continue:active {
+      transform: scale(0.97);
+    }
+
+    .toast-btn-stop {
+      background: rgba(244, 63, 94, 0.25);
+      color: #fecdd3;
+      border: 1px solid rgba(244, 63, 94, 0.5);
+    }
+
+    .toast-btn-stop:active {
+      transform: scale(0.97);
+    }
   </style>
 </head>
 <body>
   <div class="ambient-glow"></div>
+
+  <!-- Anlık Uygulama İçi Floating Bildirim (Heads-Up Alert Dropdown) -->
+  <div id="floatingInAppNotification" class="in-app-toast" style="display: none;">
+    <div class="in-app-toast-content">
+      <div class="in-app-toast-header">
+        <div class="in-app-toast-icon" id="toastIcon">🚐</div>
+        <div class="in-app-toast-text">
+          <div class="in-app-toast-title" id="toastTitle">Canlı Konum Başladı</div>
+          <div class="in-app-toast-time" id="toastTime">Şimdi</div>
+        </div>
+        <button class="in-app-toast-close" onclick="dismissInAppNotification()" title="Kapat">&times;</button>
+      </div>
+      <div class="in-app-toast-body" id="toastBody">
+        Aracınız için canlı GPS yayını başladı. Şirket yönetimi ve yolcular haritada anlık izliyor.
+      </div>
+      <div class="in-app-toast-actions">
+        <button type="button" class="toast-btn toast-btn-continue" onclick="handleToastContinue()">
+          ▶️ Devam Et
+        </button>
+        <button type="button" class="toast-btn toast-btn-stop" onclick="handleToastStop()">
+          ⏹️ Canlı Konumu Durdur
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Header -->
   <header class="header">
@@ -444,6 +742,30 @@
          ========================================================================= -->
     <div id="sectionDriverCockpit" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
       
+      <!-- CANLI YAYIN AKTİF — DİNAMİK GLOWING KOKPİT BANNERI -->
+      <div id="bannerLiveBroadcastingActive" class="live-broadcast-banner" style="display: none;">
+        <div class="live-banner-radar">
+          <span class="radar-dot"></span>
+          <span class="radar-ring"></span>
+          <span class="live-banner-headline">🟢 CANLI KONUM YAYINDA</span>
+        </div>
+        <div class="live-banner-meta">
+          <div class="live-banner-plate" id="liveBannerPlate">41 B 1441</div>
+          <div class="live-banner-timer" id="liveBannerTimer">⏱️ Sefer Süresi: 00:00</div>
+        </div>
+        <div class="live-banner-sub" id="liveBannerSub">
+          Aracınızın anlık GPS koordinatları şirket yönetimi ve yolcular için canlı yayınlanıyor.
+        </div>
+        <div class="live-banner-quick-actions">
+          <button type="button" class="btn-live-quick stop" onclick="stopTracking()">
+            🛑 Canlı Konumu Durdur
+          </button>
+          <button type="button" class="btn-live-quick finish" onclick="handleFinishTripClick()">
+            🏁 Seferi Tamamla / Bitir
+          </button>
+        </div>
+      </div>
+
       <!-- 0. Mobil Bildirim & HTTPS Bağlantı Durumu Kartı -->
       <div class="card" id="cardNotifDiagnostic" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(59, 130, 246, 0.35);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -664,7 +986,36 @@
     let simInterval = null;
     let swRegistration = null;
 
-    // Web Audio Beep / Chime
+    // Sefer Süresi Kronometresi
+    let tripDurationSeconds = 0;
+    let tripDurationInterval = null;
+
+    function startTripTimer() {
+      if (tripDurationInterval) clearInterval(tripDurationInterval);
+      const timerEl = document.getElementById('liveBannerTimer');
+      tripDurationInterval = setInterval(() => {
+        tripDurationSeconds++;
+        const mins = Math.floor(tripDurationSeconds / 60).toString().padStart(2, '0');
+        const secs = (tripDurationSeconds % 60).toString().padStart(2, '0');
+        if (timerEl) {
+          timerEl.innerText = `⏱️ Sefer Süresi: ${mins}:${secs}`;
+        }
+      }, 1000);
+    }
+
+    function stopTripTimer() {
+      if (tripDurationInterval) {
+        clearInterval(tripDurationInterval);
+        tripDurationInterval = null;
+      }
+      tripDurationSeconds = 0;
+      const timerEl = document.getElementById('liveBannerTimer');
+      if (timerEl) {
+        timerEl.innerText = '⏱️ Sefer Süresi: 00:00';
+      }
+    }
+
+    // Web Audio Beep / Chime (Sıfır Gecikme ile Sentezlenen Sesler)
     function playBeep(freq = 600, duration = 0.15) {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -673,7 +1024,7 @@
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
@@ -682,8 +1033,8 @@
 
     function playSuccessChime() {
       playBeep(523.25, 0.15);
-      setTimeout(() => playBeep(659.25, 0.15), 150);
-      setTimeout(() => playBeep(783.99, 0.35), 300);
+      setTimeout(() => playBeep(659.25, 0.15), 130);
+      setTimeout(() => playBeep(783.99, 0.35), 260);
     }
 
     function playArrivalFanfare() {
@@ -693,46 +1044,107 @@
       setTimeout(() => playBeep(880, 0.4), 380);
     }
 
+    // =========================================================================
+    // ANLIK UYGULAMA İÇİ FLOATING BİLDİRİM (HEADS-UP ALERT BANNER - 0ms GECİKME)
+    // =========================================================================
+    let inAppToastTimeout = null;
+
+    function showInAppNotification(title, body, actions = [], icon = '🚐') {
+      const toastEl = document.getElementById('floatingInAppNotification');
+      if (!toastEl) return;
+
+      const titleEl = document.getElementById('toastTitle');
+      const bodyEl = document.getElementById('toastBody');
+      const iconEl = document.getElementById('toastIcon');
+      const timeEl = document.getElementById('toastTime');
+
+      if (titleEl) titleEl.innerText = title;
+      if (bodyEl) bodyEl.innerText = body;
+      if (iconEl) iconEl.innerText = icon;
+      if (timeEl) {
+        const now = new Date();
+        timeEl.innerText = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      }
+
+      // 1. Anında Ses Çal (0ms gecikme)
+      playSuccessChime();
+
+      // 2. Anında Titreşim
+      if (navigator.vibrate) {
+        navigator.vibrate([250, 100, 250]);
+      }
+
+      // 3. Ekrana Düşür
+      toastEl.style.display = 'block';
+      toastEl.style.animation = 'slideDownToast 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+
+      if (inAppToastTimeout) clearTimeout(inAppToastTimeout);
+      inAppToastTimeout = setTimeout(() => {
+        dismissInAppNotification();
+      }, 7500);
+    }
+
+    function dismissInAppNotification() {
+      const toastEl = document.getElementById('floatingInAppNotification');
+      if (!toastEl) return;
+      toastEl.style.animation = 'slideUpToast 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+      setTimeout(() => {
+        toastEl.style.display = 'none';
+      }, 300);
+      if (inAppToastTimeout) {
+        clearTimeout(inAppToastTimeout);
+        inAppToastTimeout = null;
+      }
+    }
+
+    function handleToastContinue() {
+      playBeep(700, 0.1);
+      dismissInAppNotification();
+    }
+
+    function handleToastStop() {
+      playBeep(440, 0.15);
+      dismissInAppNotification();
+      stopTracking();
+    }
+
     // Haversine İki Nokta Arası Metre Mesafe Hesabı
     function calcHaversineMeters(lat1, lon1, lat2, lon2) {
       const R = 6371e3; // metres
-      const φ1 = lat1 * Math.PI / 180;
-      const φ2 = lat2 * Math.PI / 180;
-      const Δφ = (lat2 - lat1) * Math.PI / 180;
-      const Δλ = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const phi1 = lat1 * Math.PI / 180;
+      const phi2 = lat2 * Math.PI / 180;
+      const dPhi = (lat2 - lat1) * Math.PI / 180;
+      const dLam = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(dLam/2) * Math.sin(dLam/2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       return R * c;
     }
 
-    // Mobil PWA ve Bildirim Çubuğu Uyumlu Sistem Bildirimi
-    async function sendMobileNotification(title, body, actions = [], tag = 'servis360-live') {
-      if (!('Notification' in window)) return;
+    // Mobil PWA ve Bildirim Çubuğu Uyumlu Sistem Bildirimi (Anında Düşer & Asenkron)
+    function sendMobileNotification(title, body, actions = [], tag = 'servis360-live', icon = '🚐') {
+      // 1. ÖNCE: Uygulama açıkken ekrana ANINDA ve gecikmesiz düşen Heads-Up Bildirimi
+      showInAppNotification(title, body, actions, icon);
 
-      if (Notification.permission !== 'granted') {
-        try {
-          const perm = await Notification.requestPermission();
-          if (perm !== 'granted') return;
-        } catch (e) {
-          return;
-        }
-      }
+      // 2. SONRA: Telefon kilit ekranı & bildirim çubuğu için arka plan OS Push bildirimi
+      if (!('Notification' in window)) return;
 
       const defaultActions = [
         { action: 'continue', title: '▶️ Devam Et' },
         { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
       ];
 
+      // Her bildirim için benzersiz zaman damgası ekle, böylece Android Chrome bildirimi birleştirmeden anında çaldırır!
+      const uniqueTag = `${tag}-${Date.now()}`;
       const notifOptions = {
         body: body,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        tag: tag,
+        tag: uniqueTag,
         renotify: true,
-        requireInteraction: true,
-        vibrate: [250, 100, 250],
+        requireInteraction: false,
+        vibrate: [300, 150, 300],
         actions: (actions && actions.length > 0) ? actions : defaultActions,
         data: {
           url: '/driver.html',
@@ -740,29 +1152,28 @@
         }
       };
 
-      // 1. Service Worker ile göster (Mobil Android ve PWA'da butonlarla çalışır)
-      try {
-        if ('serviceWorker' in navigator) {
-          const reg = swRegistration || (await navigator.serviceWorker.ready);
-          if (reg && reg.showNotification) {
-            await reg.showNotification(title, notifOptions);
-            return;
+      // Asenkron ve donmasız gönder (UI'yi hiçbir şekilde bekletmez)
+      (async () => {
+        try {
+          if (Notification.permission !== 'granted') {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') return;
+            updateNotificationUiStatus();
           }
-        }
-      } catch (err) {
-        console.warn('SW showNotification hatası:', err);
-      }
 
-      // 2. Fallback: Standart Web Notification (Masaüstü)
-      try {
-        new Notification(title, {
-          body: body,
-          icon: '/icon-192.png',
-          tag: tag
-        });
-      } catch (e) {
-        console.warn('Fallback Notification hatası:', e);
-      }
+          if ('serviceWorker' in navigator) {
+            const reg = swRegistration || (await navigator.serviceWorker.ready);
+            if (reg && reg.showNotification) {
+              await reg.showNotification(title, notifOptions);
+              return;
+            }
+          }
+
+          new Notification(title, notifOptions);
+        } catch (err) {
+          console.warn('Sistem bildirim hatası:', err);
+        }
+      })();
     }
 
     function updateNotificationUiStatus() {
@@ -804,36 +1215,25 @@
     }
 
     async function testMobileNotification() {
-      playSuccessChime();
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-      if (!('Notification' in window)) {
-        alert("Tarayıcınız sistem bildirimlerini desteklemiyor.");
-        return;
-      }
-
-      if (Notification.permission !== 'granted') {
-        const perm = await Notification.requestPermission();
-        updateNotificationUiStatus();
-        if (perm !== 'granted') {
-          alert("Bildirim izni verilmedi. Bildirimlerin telefonunuza gelebilmesi için tarayıcının veya Android Ayarları > Uygulamalar > Chrome/Servis360 bildirimlerine izin verilmelidir.");
-          return;
-        }
-      }
-
-      updateNotificationUiStatus();
-
-      await sendMobileNotification(
+      // 1. Doğrudan anlık bildirim fırlat
+      sendMobileNotification(
         "✅ Servis360 Bildirim Testi",
         "Mobil bildirimler ve [▶️ Devam Et] / [⏹️ Canlı Konumu Durdur] butonları telefonunuzda aktif çalışıyor!",
         [
           { action: 'continue', title: '▶️ Devam Et' },
           { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
         ],
-        "test-notification"
+        "test-notification",
+        "🔔"
       );
 
-      alert("📲 Test bildirimi telefonunuza gönderildi! Lütfen telefonunuzun üst bildirim çubuğunu aşağı kaydırıp kontrol edin.");
+      // İzin yoksa istemeyi tetikle
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        try {
+          const perm = await Notification.requestPermission();
+          updateNotificationUiStatus();
+        } catch (e) {}
+      }
     }
 
     function reinstallPwaNotice() {
@@ -981,6 +1381,12 @@
       checkAndEnforceLocationPermission();
       startAutoShiftClockCheck();
       updateNotificationUiStatus();
+
+      // CANLI KONUM KONTROLÜ: Eğer araç veritabanında "running" (yayında) durumundaysa, kokpitte takibi derhal başlat ve canlı bannerı aç!
+      if (activeShuttle && activeShuttle.current_status === 'running' && !isTracking) {
+        console.log('🟢 Servis veritabanında aktif (running) kayıtlı, kokpitte canlı GPS akışı sürdürülüyor...');
+        startTracking(false, true); // isAutoResume = true
+      }
     }
 
     // Sunucudan en güncel servis, rota ve durak verilerini çek
@@ -1316,7 +1722,7 @@
       } catch (e) {}
     }
 
-    // Vardiya Saati Otomatik Kontrolü (07:15 ve 16:45 / Dönüş saati olduğunda kontrol)
+    // Vardiya Saati Otomatik Kontrolü (07:15 ve 16:45 / Dönüş saati olduğunda anlık başlatma)
     function startAutoShiftClockCheck() {
       if (autoClockInterval) clearInterval(autoClockInterval);
       
@@ -1324,13 +1730,20 @@
         Notification.requestPermission();
       }
 
-      autoClockInterval = setInterval(async () => {
+      const executeShiftCheck = async () => {
         if (!activeShuttle) return;
 
         // Her kontrol öncesi saatleri güncel tut
         await syncShuttleDetailsFromServer();
 
+        // Eğer araç zaten canlı yayındaysa tekrar başlatma
         if (isTracking) return;
+
+        // Eğer veritabanında araç running statüsündeyse doğrudan kokpiti canlıya al
+        if (activeShuttle.current_status === 'running') {
+          startTracking(false, true);
+          return;
+        }
 
         const now = new Date();
         const currentHours = now.getHours().toString().padStart(2, '0');
@@ -1359,7 +1772,13 @@
             { enableHighAccuracy: true, timeout: 5000 }
           );
         }
-      }, 15000);
+      };
+
+      // 1. Kokpit açıldığında HİÇ BEKLEMEDEN 1. kontrolü hemen yap!
+      executeShiftCheck();
+
+      // 2. Ardından her 10 saniyede bir kontrol et (gecikme olmasın)
+      autoClockInterval = setInterval(executeShiftCheck, 10000);
     }
 
     // Sefer Otomatik / Manuel Alarm ile Başlatma
@@ -1380,7 +1799,8 @@
           { action: 'continue', title: '▶️ Devam Et' },
           { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
         ],
-        "shift-time-alarm"
+        "shift-time-alarm",
+        "⏰"
       );
 
       startTracking();
@@ -1404,6 +1824,26 @@
         }).addTo(driverMap);
       } else {
         driverMap.invalidateSize();
+      }
+
+      // Eğer aracın son koordinatları varsa araç işaretçisini haritaya hemen yerleştir!
+      if (activeShuttle.last_lat && activeShuttle.last_lng) {
+        const sLat = parseFloat(activeShuttle.last_lat);
+        const sLng = parseFloat(activeShuttle.last_lng);
+        if (!isNaN(sLat) && !isNaN(sLng)) {
+          if (!driverMarker) {
+            const shuttleIcon = L.divIcon({
+              className: 'custom-pin',
+              html: `<div style="font-size:26px; filter: drop-shadow(0 0 10px #3b82f6);">🚐</div>`,
+              iconSize: [32, 32],
+              iconAnchor: [16, 16]
+            });
+            driverMarker = L.marker([sLat, sLng], { icon: shuttleIcon }).addTo(driverMap);
+          } else {
+            driverMarker.setLatLng([sLat, sLng]);
+          }
+          driverMap.setView([sLat, sLng], 14);
+        }
       }
 
       updateMapDestinationCircle();
@@ -1486,14 +1926,21 @@
       document.getElementById('btnGpsText').innerText = '📡 YENİ SEFER BAŞLAT';
     }
 
-    function startTracking() {
+    function startTracking(isSimulated = false, isAutoResume = false) {
       if (!activeShuttle) return;
-
-      playBeep(880, 0.2);
-      if (navigator.vibrate) navigator.vibrate(100);
 
       isTracking = true;
       updateUiTrackingState(true);
+
+      // Sunucuya statüyü 'running' olarak ilet (Web sitesi ve sunucuyla anında senkron)
+      fetch(`/api/shuttle/${activeShuttle.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'running' })
+      }).catch(e => console.warn('Statü güncelleme hatası:', e));
+
+      playBeep(880, 0.2);
+      if (navigator.vibrate) navigator.vibrate(100);
 
       const isEvening = currentTripType === 'evening';
       const companyName = activeShuttle.workplace_name || activeShuttle.company_name || 'Firmaya';
@@ -1508,19 +1955,31 @@
         ? `${activeShuttle.plate} aracı için akşam dağıtım canlı GPS yayını başladı. Tüm yolcular son durağa (${lastStopTitle}) kadar anlık izliyor.`
         : `${activeShuttle.plate} aracı için sabah işe gidiş canlı GPS yayını başladı. ${companyName} hedefine kadar tüm duraklar izleniyor.`;
 
-      // Bildirim üstünde Devam Et / Canlı Konumu Durdur butonları ile mobil bildirim gönder
-      sendMobileNotification(
-        notifTitle,
-        notifBody,
-        [
-          { action: 'continue', title: '▶️ Devam Et' },
-          { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-        ],
-        'servis360-trip-start'
-      );
+      // Bildirim üstünde Devam Et / Canlı Konumu Durdur butonları ile anlık bildirim gönder
+      if (!isAutoResume) {
+        sendMobileNotification(
+          notifTitle,
+          notifBody,
+          [
+            { action: 'continue', title: '▶️ Devam Et' },
+            { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
+          ],
+          'servis360-trip-start',
+          '🟢'
+        );
+      } else {
+        showInAppNotification(
+          "🟢 Canlı GPS Yayını Aktif",
+          `${activeShuttle.plate} aracı için canlı konum yayını devam ediyor. Şirket ve yolcular anlık izliyor.`,
+          [
+            { action: 'continue', title: '▶️ Devam Et' },
+            { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
+          ],
+          '🟢'
+        );
+      }
 
-      if (!navigator.geolocation) {
-        alert('Cihazınızda GPS bulunamadı, simülasyon koordinatları ile canlı yayın başlatılıyor.');
+      if (isSimulated || !navigator.geolocation) {
         startSimulatedGpsStream();
         return;
       }
@@ -1533,7 +1992,6 @@
 
       watchId = navigator.geolocation.watchPosition(handleGpsSuccess, (err) => {
         console.warn('GPS donanımı bekleniyor veya simülasyona geçiliyor:', err);
-        // Eğer konum açılamazsa veya masaüstü testindeyse koordinat simülasyonu başlat
         startSimulatedGpsStream();
       }, options);
     }
@@ -1551,6 +2009,22 @@
       isTracking = false;
       updateUiTrackingState(false);
       playBeep(440, 0.2);
+
+      // Sunucuya statüyü 'idle' olarak ilet (Web sitesiyle anında senkron)
+      if (activeShuttle) {
+        fetch(`/api/shuttle/${activeShuttle.id}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'idle' })
+        }).catch(e => console.warn('Statü idle güncelleme hatası:', e));
+      }
+
+      showInAppNotification(
+        "⏹️ Canlı Konum Durduruldu",
+        "Canlı GPS yayını kapatıldı. İstediğiniz zaman [📡 CANLI KONUMU BAŞLAT] butonu ile tekrar başlatabilirsiniz.",
+        [],
+        "⏹️"
+      );
     }
 
     // Durak Sanal Çit Kontrolleri ve Aşamalı Bildirimler
@@ -1785,6 +2259,9 @@
       const btn = document.getElementById('btnToggleGps');
       const btnText = document.getElementById('btnGpsText');
       const btnFinish = document.getElementById('btnFinishTrip');
+      const liveBanner = document.getElementById('bannerLiveBroadcastingActive');
+      const livePlate = document.getElementById('liveBannerPlate');
+      const liveSub = document.getElementById('liveBannerSub');
 
       if (active) {
         pill.classList.add('active');
@@ -1793,12 +2270,29 @@
         btn.classList.add('stop');
         btnText.innerText = '🛑 CANLI KONUMU DURDUR';
         if (btnFinish) btnFinish.style.display = 'flex';
+
+        if (liveBanner) {
+          liveBanner.style.display = 'flex';
+          if (livePlate && activeShuttle) livePlate.innerText = activeShuttle.plate;
+          if (liveSub && activeShuttle) {
+            const isEvening = currentTripType === 'evening';
+            const lastStopTitle = lastStop ? lastStop.stop_name : (firstStop ? firstStop.name : 'Son Durak');
+            liveSub.innerText = isEvening 
+              ? `Akşam Dağıtımı: Son durağa (${lastStopTitle}) kadar canlı GPS koordinatlarınız yayınlanıyor.` 
+              : `Sabah Toplaması: ${activeShuttle.workplace_name || activeShuttle.company_name || 'Hedefe'} kadar canlı GPS koordinatlarınız yayınlanıyor.`;
+          }
+        }
+        startTripTimer();
       } else {
         pill.classList.remove('active');
         pillText.innerText = 'BEKLEMEDE';
         btn.classList.remove('stop');
         btn.classList.add('start');
         btnText.innerText = '📡 CANLI KONUMU BAŞLAT';
+        if (btnFinish) btnFinish.style.display = 'none';
+
+        if (liveBanner) liveBanner.style.display = 'none';
+        stopTripTimer();
       }
     }
   </script>

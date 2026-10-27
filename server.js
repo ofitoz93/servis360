@@ -622,6 +622,29 @@ app.post('/api/shuttle/:shuttleId/finish-trip', async (req, res) => {
   }
 });
 
+// Şoförün canlı konumu başlatması veya durdurması durumunda statü güncelleme
+app.post('/api/shuttle/:shuttleId/status', async (req, res) => {
+  const { shuttleId } = req.params;
+  const { status } = req.body;
+  try {
+    const updateRes = await pool.query(`
+      UPDATE shuttles 
+      SET current_status = $1
+      WHERE id = $2
+      RETURNING *
+    `, [status || 'idle', shuttleId]);
+
+    res.json({
+      success: true,
+      status: status || 'idle',
+      shuttle: updateRes.rows[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Şoför kokpiti için en güncel servis, sefer saatleri, güzergah ve yolcu senkronizasyonu
 app.get('/api/shuttle/:shuttleId/sync', async (req, res) => {
   const { shuttleId } = req.params;
