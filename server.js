@@ -477,7 +477,7 @@ app.post('/api/company/:companyId/employees', async (req, res) => {
 app.get('/api/shuttles/available', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT s.id, s.plate, s.model, s.driver_name, s.driver_phone, s.shift_start_time, s.current_status,
+      SELECT s.id, s.plate, s.model, s.driver_name, s.driver_phone, s.shift_start_time, s.return_time, s.current_status,
              c.company_name, c.workplace_name, c.workplace_lat, c.workplace_lng, c.geofence_radius_meters, c.operation_type
       FROM shuttles s
       JOIN companies c ON s.company_id = c.id
@@ -639,16 +639,25 @@ app.get('/api/shuttle/:shuttleId/sync', async (req, res) => {
       ORDER BY COALESCE(st.stop_order, 999) ASC, e.id ASC
     `, [shuttleId]);
 
-    // Servise ait rotayı getir
+    // Servise ait rotayı ve durakları getir
     const routeRes = await pool.query(`
       SELECT * FROM routes WHERE shuttle_id = $1 ORDER BY id DESC LIMIT 1
     `, [shuttleId]);
+
+    let stops = [];
+    if (routeRes.rows.length > 0) {
+      const stopsRes = await pool.query(`
+        SELECT * FROM stops WHERE route_id = $1 ORDER BY stop_order ASC
+      `, [routeRes.rows[0].id]);
+      stops = stopsRes.rows;
+    }
 
     res.json({
       success: true,
       shuttle,
       passengers: passRes.rows,
-      route: routeRes.rows[0] || null
+      route: routeRes.rows[0] || null,
+      stops: stops
     });
   } catch (err) {
     console.error(err);
@@ -661,7 +670,7 @@ app.get('/api/shuttle/:shuttleId/location', async (req, res) => {
   const { shuttleId } = req.params;
   try {
     const resRow = await pool.query(`
-      SELECT s.id, s.plate, s.last_lat, s.last_lng, s.current_status, s.driver_name, s.shift_start_time
+      SELECT s.id, s.plate, s.last_lat, s.last_lng, s.current_status, s.driver_name, s.shift_start_time, s.return_time
       FROM shuttles s
       WHERE s.id = $1
     `, [shuttleId]);
@@ -671,6 +680,28 @@ app.get('/api/shuttle/:shuttleId/location', async (req, res) => {
     }
 
     res.json({ success: true, shuttle: resRow.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Firmanın tüm servislerinin canlı konumlarını toplu getirme (Haritada "Araçlar Nerede" görünümü için)
+app.get('/api/company/:companyId/shuttles/live-locations', async (req, res) => {
+  const { companyId } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT ON (s.id)
+             s.id, s.plate, s.model, s.driver_name, s.driver_phone, 
+             s.shift_start_time, s.return_time, s.current_status, s.last_lat, s.last_lng,
+             r.id as route_id, r.route_name
+      FROM shuttles s
+      LEFT JOIN routes r ON r.shuttle_id = s.id
+      WHERE s.company_id = $1
+      ORDER BY s.id ASC
+    `, [companyId]);
+
+    res.json({ success: true, shuttles: result.rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

@@ -73,6 +73,17 @@ async function fetchOsrmRoadRoute(coords) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const savedAdmin = localStorage.getItem('servis360_admin_session');
+  if (savedAdmin) {
+    try {
+      const user = JSON.parse(savedAdmin);
+      state.currentUser = user;
+      setupUserDashboard(user);
+      return;
+    } catch (e) {
+      localStorage.removeItem('servis360_admin_session');
+    }
+  }
   showLoginScreen();
 });
 
@@ -158,8 +169,9 @@ async function handleLoginSubmit(e) {
       return;
     }
 
-    // Yönetici / Firma Girişi
+    // Yönetici / Firma Girişi (Şoför oturumunu ASLA ezmez, bağımsızdır)
     state.currentUser = data.user;
+    localStorage.setItem('servis360_admin_session', JSON.stringify(data.user));
     setupUserDashboard(data.user);
     showToast("Hoş Geldiniz", `${data.user.full_name} olarak giriş yapıldı.`, "success");
   } catch (err) {
@@ -171,6 +183,8 @@ async function handleLoginSubmit(e) {
 }
 
 function handleLogout() {
+  localStorage.removeItem('servis360_admin_session');
+  state.currentUser = null;
   showLoginScreen();
   document.getElementById('inputPassword').value = '';
   showToast("Oturum Kapatıldı", "Güvenli çıkış yapıldı.", "info");
@@ -702,6 +716,7 @@ async function saveRouteFromBuilder() {
 // =========================================================================
 let autoDriveInterval = null;
 let currentLiveRoadPoints = [];
+let allCompanyShuttleMarkers = {};
 
 function setupLiveMapOrEmptyState() {
   const data = state.activeCompanyData;
@@ -715,19 +730,24 @@ function setupLiveMapOrEmptyState() {
     emptyStateBox.style.display = 'none';
     activeContainer.style.display = 'block';
 
-    // Rota seçici dropdown'u doldur
+    // Rota seçici dropdown'u doldur (Başta TÜM ARAÇLAR seçeneği ile)
     const routeSelect = document.getElementById('liveMapRouteSelect');
     if (routeSelect) {
-      // Önce en son eklenen veya road_geometry olan rotayı varsayılan yap
-      let defaultRoute = data.routes.find(r => r.road_geometry && Array.isArray(r.road_geometry) && r.road_geometry.length > 0) || data.routes[data.routes.length - 1];
-      if (!state.activeRouteId || !data.routes.find(r => r.id === state.activeRouteId)) {
-        state.activeRouteId = defaultRoute ? defaultRoute.id : data.routes[0].id;
+      if (!state.activeRouteId) {
+        state.activeRouteId = 'all';
       }
 
-      routeSelect.innerHTML = data.routes.map(r => {
-        const distStr = r.total_distance_km ? ` (${r.total_distance_km} km)` : '';
-        return `<option value="${r.id}" ${r.id === state.activeRouteId ? 'selected' : ''}>${r.route_name}${distStr}</option>`;
-      }).join('');
+      routeSelect.innerHTML = `
+        <option value="all" ${state.activeRouteId === 'all' ? 'selected' : ''}>🌐 TÜM ARAÇLAR (Filo Genel Bakış)</option>
+        ${data.routes.map(r => {
+          const matchedS = data.shuttles.find(s => s.id === r.shuttle_id);
+          const plateStr = matchedS ? `🚐 ${matchedS.plate}` : '🚐 Servis';
+          const driverStr = (matchedS && matchedS.driver_name) ? ` (${matchedS.driver_name})` : '';
+          const distStr = r.total_distance_km ? ` [~${r.total_distance_km} km]` : '';
+          const liveStatus = (matchedS && matchedS.current_status === 'running') ? ' 🟢 [CANLI YAYIN]' : '';
+          return `<option value="${r.id}" ${r.id === state.activeRouteId ? 'selected' : ''}>${plateStr} - ${r.route_name}${driverStr}${distStr}${liveStatus}</option>`;
+        }).join('')}
+      `;
     }
 
     setTimeout(() => {
@@ -760,7 +780,7 @@ function setLiveMapDirection(dir) {
 }
 
 function onLiveMapRouteChange(routeId) {
-  state.activeRouteId = parseInt(routeId);
+  state.activeRouteId = routeId === 'all' ? 'all' : parseInt(routeId);
   resetLiveSimulation();
   if (state.activeCompanyData) {
     initLiveMapWithCompanyRoutes(state.activeCompanyData, state.activeRouteId);
@@ -775,7 +795,57 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
   const targetCoord = [comp.workplace_lat, comp.workplace_lng];
   const isSchool = comp.operation_type === 'school';
 
-  // Seçili rotayı bul
+  // 1. TÜM ARAÇLARI İZLEME MODU (targetRouteId === 'all')
+  if (targetRouteId === 'all') {
+    const metaEl = document.getElementById('liveMapRouteMeta');
+    if (metaEl) {
+      metaEl.innerHTML = `🛣️ <b>Tüm Şirket Filosu Canlı İzleniyor</b> • 📍 Aşağıdaki haritada ve kartlarda tüm servisler gerçek zamanlı sinyalleriyle gösterilmektedir.`;
+    }
+
+    if (!liveMap) {
+      liveMap = L.map('leafletMap', {
+        zoomControl: true,
+        attributionControl: false
+      }).setView(targetCoord, 12);
+
+      createOsmTileLayer().addTo(liveMap);
+    } else {
+      liveMap.invalidateSize();
+      if (liveMapShuttleMarker) liveMap.removeLayer(liveMapShuttleMarker);
+      if (liveMapGeofenceCircle) liveMap.removeLayer(liveMapGeofenceCircle);
+      if (liveMapPolyline) liveMap.removeLayer(liveMapPolyline);
+      liveMapStopMarkers.forEach(m => liveMap.removeLayer(m));
+      liveMapStopMarkers = [];
+      Object.values(allCompanyShuttleMarkers).forEach(m => liveMap.removeLayer(m));
+      allCompanyShuttleMarkers = {};
+    }
+
+    // Hedef Sanal Çiti Çiz
+    liveMapGeofenceCircle = L.circle(targetCoord, {
+      radius: comp.geofence_radius_meters || 180,
+      color: '#f43f5e',
+      fillColor: '#f43f5e',
+      fillOpacity: 0.18,
+      dashArray: '8, 8',
+      weight: 2
+    }).addTo(liveMap);
+
+    const targetIcon = L.divIcon({
+      className: 'custom-pin',
+      html: `<div class="workplace-marker-icon">${isSchool ? '🏫' : '🏢'}</div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+
+    L.marker(targetCoord, { icon: targetIcon })
+      .bindPopup(`<b>${comp.workplace_name}</b><br>${isSchool ? 'Okul Kampüsü' : 'Fabrika / Tesis'}`)
+      .addTo(liveMap);
+
+    startRealGpsPolling();
+    return;
+  }
+
+  // 2. TEKİL ROTA İZLEME MODU
   let currentRoute = data.routes.find(r => r.id === targetRouteId) || data.routes[data.routes.length - 1];
   if (!currentRoute) return;
 
@@ -806,6 +876,8 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
     if (liveMapPolyline) liveMap.removeLayer(liveMapPolyline);
     liveMapStopMarkers.forEach(m => liveMap.removeLayer(m));
     liveMapStopMarkers = [];
+    Object.values(allCompanyShuttleMarkers).forEach(m => liveMap.removeLayer(m));
+    allCompanyShuttleMarkers = {};
   }
 
   // 1. Hedef Sanal Çiti Çiz
@@ -868,17 +940,26 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
     liveMap.fitBounds(liveMapPolyline.getBounds(), { padding: [40, 40] });
   }
 
-  // 4. Servis Aracını Başlangıç Noktasına Yerleştir
-  const shuttleStart = roadPoints[0] || targetCoord;
+  // 4. Servis Aracını Başlangıç Noktasına veya Son Canlı Konumuna Yerleştir
+  const shuttleStart = (matchedShuttle && matchedShuttle.last_lat && matchedShuttle.last_lng) 
+    ? [matchedShuttle.last_lat, matchedShuttle.last_lng] 
+    : (roadPoints[0] || targetCoord);
+
+  const isRunning = matchedShuttle && matchedShuttle.current_status === 'running';
   const shuttleIcon = L.divIcon({
     className: 'custom-pin',
-    html: `<div class="shuttle-marker-icon" id="liveShuttleMarkerEl">🚐</div>`,
+    html: `<div class="shuttle-marker-icon ${isRunning ? 'active-pulse' : ''}" id="liveShuttleMarkerEl" style="${isRunning ? 'border: 2px solid #10b981; background: #064e3b;' : ''}">
+      🚐
+      <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; background: #0f172a; padding: 2px 6px; border-radius: 6px; border: 1px solid ${isRunning ? '#10b981' : '#3b82f6'}; color: ${isRunning ? '#34d399' : '#fff'}; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+        ${matchedShuttle ? matchedShuttle.plate : 'Servis'} ${isRunning ? '🟢 CANLI' : ''}
+      </div>
+    </div>`,
     iconSize: [38, 38],
     iconAnchor: [19, 19]
   });
 
   liveMapShuttleMarker = L.marker(shuttleStart, { icon: shuttleIcon })
-    .bindPopup(`<b>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</b><br>Şoför: ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'}<br>İstikamet: ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}`)
+    .bindPopup(`<b>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</b><br>Şoför: ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'}<br>Durum: ${isRunning ? '🟢 Canlı GPS Yayını Yapıyor' : 'Beklemede'}<br>İstikamet: ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}`)
     .addTo(liveMap);
 
   setTimeout(() => {
@@ -1019,38 +1100,163 @@ function simulateArrivalGeofence() {
   }
 }
 
-// Telefondan Canlı Şoför GPS Takip Yoklayıcısı (Polling)
+// Telefondan Canlı Şoför GPS Takip Yoklayıcısı (Polling - Tüm Şirket Filosunu İzler)
 let realGpsPollingInterval = null;
 
 function startRealGpsPolling() {
   if (realGpsPollingInterval) clearInterval(realGpsPollingInterval);
   
   realGpsPollingInterval = setInterval(async () => {
-    if (!state.activeCompanyData || !state.activeRouteId || !liveMap || !liveMapShuttleMarker) return;
-    const currentRoute = state.activeCompanyData.routes.find(r => r.id === state.activeRouteId);
-    if (!currentRoute || !currentRoute.shuttle_id) return;
+    if (!state.activeCompanyData || !liveMap) return;
+    const compId = state.activeCompanyData.company.id;
 
     try {
-      const res = await fetch(`/api/shuttle/${currentRoute.shuttle_id}/location`);
+      const res = await fetch(`/api/company/${compId}/shuttles/live-locations`);
       const data = await res.json();
-      if (data.success && data.shuttle && data.shuttle.last_lat && data.shuttle.last_lng) {
-        const phoneLat = data.shuttle.last_lat;
-        const phoneLng = data.shuttle.last_lng;
-        
-        // Eğer telefon yayındaysa haritadaki servis pini telefonun olduğu yere taşınır!
-        if (data.shuttle.current_status === 'running') {
-          liveMapShuttleMarker.setLatLng([phoneLat, phoneLng]);
-          const statusBadge = document.getElementById('liveMapStatusBadge');
-          if (statusBadge) {
-            statusBadge.innerText = '🟢 Şoför Telefondan Canlı Yayında (Gerçek GPS)';
+      if (data.success && Array.isArray(data.shuttles)) {
+        let activeLivePlates = [];
+
+        // Filo kartlarını güncelle
+        renderFleetLiveCards(data.shuttles);
+
+        data.shuttles.forEach(s => {
+          if (!s.last_lat || !s.last_lng) return;
+          const latLng = [parseFloat(s.last_lat), parseFloat(s.last_lng)];
+
+          const isCurrentRouteShuttle = state.activeCompanyData && state.activeRouteId && state.activeRouteId !== 'all' && (() => {
+            const currentRoute = state.activeCompanyData.routes.find(r => r.id === state.activeRouteId);
+            return currentRoute && currentRoute.shuttle_id === s.id;
+          })();
+
+          if (s.current_status === 'running') {
+            activeLivePlates.push(s.plate);
+          }
+
+          // Seçili rotanın aracı ise ana marker'ı güncelle
+          if (isCurrentRouteShuttle && liveMapShuttleMarker) {
+            liveMapShuttleMarker.setLatLng(latLng);
+            const markerEl = document.getElementById('liveShuttleMarkerEl');
+            if (markerEl) {
+              if (s.current_status === 'running') {
+                markerEl.classList.add('active-pulse');
+                markerEl.style.border = '2px solid #10b981';
+                markerEl.style.background = '#064e3b';
+              } else {
+                markerEl.classList.remove('active-pulse');
+              }
+            }
+          } else {
+            // TÜM şirket araçlarını haritada ayrı pinler olarak göster! ("Araçlar Nerede" görünümü)
+            const isOtherRunning = s.current_status === 'running';
+            const isArrived = s.current_status === 'arrived' || s.current_status === 'completed';
+            const statusColor = isOtherRunning ? '#10b981' : (isArrived ? '#3b82f6' : '#64748b');
+
+            if (!allCompanyShuttleMarkers[s.id]) {
+              const otherIcon = L.divIcon({
+                className: 'custom-pin',
+                html: `<div class="shuttle-marker-icon ${isOtherRunning ? 'active-pulse' : ''}" style="${isOtherRunning ? 'border: 2px solid #10b981; background: #064e3b;' : 'background: #1e293b; opacity:0.95;'}">
+                  🚐
+                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 800; background: #0f172a; padding: 1px 5px; border-radius: 5px; border: 1px solid ${statusColor}; color: ${isOtherRunning ? '#34d399' : '#cbd5e1'}; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                    ${s.plate} ${isOtherRunning ? '🟢' : ''}
+                  </div>
+                </div>`,
+                iconSize: [34, 34],
+                iconAnchor: [17, 17]
+              });
+
+              allCompanyShuttleMarkers[s.id] = L.marker(latLng, { icon: otherIcon })
+                .bindPopup(`<b>🚐 ${s.plate}</b><br><b>Şoför:</b> ${s.driver_name || 'Şoför'}<br><b>Durum:</b> ${isOtherRunning ? '🟢 Canlı Yayında' : (isArrived ? '🏁 Tamamlandı' : 'Beklemede')}<br><b>Tel:</b> ${s.driver_phone || '-'}<br><b>Dönüş Saati:</b> ${s.return_time || '-'}`)
+                .addTo(liveMap);
+            } else {
+              allCompanyShuttleMarkers[s.id].setLatLng(latLng);
+            }
+          }
+        });
+
+        // Üst durum etiketini güncelle
+        const statusBadge = document.getElementById('liveMapStatusBadge');
+        if (statusBadge) {
+          if (activeLivePlates.length > 0) {
+            statusBadge.innerText = `🟢 ${activeLivePlates.join(', ')} Canlı Yayında (Gerçek GPS)`;
             statusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
             statusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            statusBadge.style.color = '#34d399';
+          } else {
+            statusBadge.innerText = '⏳ Araçlar Beklemede / Sefer Saati Bekleniyor';
+            statusBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+            statusBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+            statusBadge.style.color = '#fbbf24';
           }
         }
       }
-    } catch (e) {}
-  }, 3000);
+    } catch (e) {
+      console.warn('Canlı konum yoklama hatası:', e);
+    }
+  }, 2500);
 }
+
+function renderFleetLiveCards(shuttles) {
+  const container = document.getElementById('containerFleetLiveCards');
+  const countEl = document.getElementById('txtFleetLiveCount');
+  if (!container || !Array.isArray(shuttles)) return;
+
+  if (countEl) countEl.innerText = `${shuttles.length} Araç`;
+
+  container.innerHTML = shuttles.map(s => {
+    const isLive = s.current_status === 'running';
+    const isArrived = s.current_status === 'arrived' || s.current_status === 'completed';
+    const borderStyle = isLive 
+      ? 'border: 1px solid #10b981; background: rgba(16, 185, 129, 0.08);' 
+      : 'border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.03);';
+    const badgeText = isLive ? '🟢 CANLI YAYINDA' : (isArrived ? '🏁 TAMAMLANDI' : '⏳ BEKLEMEDE');
+    const badgeColor = isLive ? '#34d399' : (isArrived ? '#60a5fa' : '#fbbf24');
+    const hasCoords = s.last_lat && s.last_lng;
+
+    return `
+      <div style="padding: 0.85rem; border-radius: 12px; ${borderStyle} display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
+            <div>
+              <div style="font-family: 'Fira Code', monospace; font-size: 1.05rem; font-weight: 800; color: #fff;">${s.plate}</div>
+              <div style="font-size: 0.725rem; color: var(--text-muted);">${s.model || 'Servis Aracı'} (${s.capacity || 24} Kişi)</div>
+            </div>
+            <span style="font-size: 0.65rem; font-weight: 800; color: ${badgeColor}; background: rgba(0,0,0,0.3); padding: 0.2rem 0.45rem; border-radius: 4px; border: 1px solid ${badgeColor};">
+              ${badgeText}
+            </span>
+          </div>
+
+          <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 0.5rem; line-height: 1.5;">
+            <div>👤 <b>Şoför:</b> ${s.driver_name || 'Atanmadı'}</div>
+            <div>⏰ <b>Sefer Saatleri:</b> Sabah: ${s.shift_start_time || '07:15'} • Dönüş: ${s.return_time || '16:45'}</div>
+            <div>📍 <b>Son Sinyal:</b> ${hasCoords ? `${Number(s.last_lat).toFixed(4)}, ${Number(s.last_lng).toFixed(4)}` : 'Henüz GPS sinyali yok'}</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 0.75rem;">
+          ${hasCoords ? `
+            <button type="button" class="btn-action primary" onclick="focusOnShuttleMarker(${s.id}, ${s.last_lat}, ${s.last_lng})" style="width: 100%; padding: 0.4rem 0.5rem; font-size: 0.75rem; justify-content: center;">
+              🔍 Haritada Odaklan
+            </button>
+          ` : `
+            <button type="button" class="btn-action secondary" disabled style="width: 100%; padding: 0.4rem 0.5rem; font-size: 0.75rem; justify-content: center; opacity: 0.5;">
+              GPS Sinyali Bekleniyor
+            </button>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.focusOnShuttleMarker = function(shuttleId, lat, lng) {
+  if (!liveMap) return;
+  liveMap.setView([lat, lng], 15);
+  if (allCompanyShuttleMarkers[shuttleId]) {
+    allCompanyShuttleMarkers[shuttleId].openPopup();
+  } else if (liveMapShuttleMarker) {
+    liveMapShuttleMarker.openPopup();
+  }
+};
 
 // =========================================================================
 // 7. SÜPER ADMİN: MÜŞTERİ OLUŞTURMA & YÖNETİMİ

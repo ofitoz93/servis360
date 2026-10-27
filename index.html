@@ -559,6 +559,21 @@
                   <span>🔄 Başa Sar</span>
                 </button>
               </div>
+
+              <!-- Canlı Filo Araçları Tablosu & Kartları (İK'nın tüm araçları eşzamanlı izlemesi için) -->
+              <div style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                  <div style="font-size: 0.9rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>🚐</span>
+                    <span>Filodaki Tüm Araçların Anlık Durumu</span>
+                    <span class="badge-tag badge-success" id="txtFleetLiveCount" style="font-size: 0.7rem;">0 Araç</span>
+                  </div>
+                  <span style="font-size: 0.725rem; color: var(--text-muted);">Her 2.5 saniyede otomatik senkronize edilir</span>
+                </div>
+                <div id="containerFleetLiveCards" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem;">
+                  <!-- JS ile doldurulacak -->
+                </div>
+              </div>
             </div>
           </div>
 
