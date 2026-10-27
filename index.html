@@ -514,12 +514,23 @@
                   </div>
                 </div>
 
-                <!-- Güzergah / Rota Seçici Dropdown -->
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">İzlenecek Rota:</label>
-                  <select id="liveMapRouteSelect" class="form-control" style="width: auto; min-width: 220px; padding: 0.35rem 0.75rem; font-size: 0.825rem;" onchange="onLiveMapRouteChange(this.value)">
-                    <!-- JS ile doldurulacak -->
-                  </select>
+                <!-- Güzergah / Rota Seçici & İstikamet Seçici -->
+                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                  <div style="display: flex; background: rgba(255,255,255,0.06); padding: 2px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <button type="button" id="btnLiveDirMorning" class="btn-action primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px;" onclick="setLiveMapDirection('morning')">
+                      🌅 Sabah (Toplama)
+                    </button>
+                    <button type="button" id="btnLiveDirEvening" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px;" onclick="setLiveMapDirection('evening')">
+                      🌇 Akşam (Dönüş / Dağıtım)
+                    </button>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">Rota:</label>
+                    <select id="liveMapRouteSelect" class="form-control" style="width: auto; min-width: 180px; padding: 0.35rem 0.75rem; font-size: 0.825rem;" onchange="onLiveMapRouteChange(this.value)">
+                      <!-- JS ile doldurulacak -->
+                    </select>
+                  </div>
                 </div>
               </div>
               
@@ -529,8 +540,11 @@
 
               <!-- Test / Canlı Simülasyon Kontrolleri -->
               <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
-                <button class="btn-action success" onclick="simulateMethodBAutoStart()" title="Vardiya/Okul saati gelince şoför dokunmasa da canlı konumu başlatır">
-                  <span>⏰ 07:15 Otomatik Başlat</span>
+                <button class="btn-action success" onclick="simulateMethodBAutoStart('morning')" title="Sabah servis saati gelince canlı konumu başlatır">
+                  <span>⏰ 07:15 Sabah Başlat</span>
+                </button>
+                <button class="btn-action primary" onclick="simulateMethodBAutoStart('evening')" style="background: #0284c7; color: #fff;" title="Akşam dönüş saati (16:45) gelince canlı konumu başlatır">
+                  <span>🌇 16:45 Dönüş Başlat</span>
                 </button>
                 <button class="btn-action primary" id="btnToggleAutoDrive" onclick="toggleAutoDrive()" style="background: var(--accent-blue); color: #fff;" title="Aracı gerçek yollar boyunca otomatik sürüşe geçirir">
                   <span id="txtToggleAutoDrive">▶️ Canlı Sürüşü Başlat</span>
@@ -538,8 +552,8 @@
                 <button class="btn-action secondary" onclick="stepShuttleProgress()" title="Manuel olarak birkaç adım ilerletir">
                   <span>⏩ Manuel Adım İlerlet</span>
                 </button>
-                <button class="btn-action secondary" onclick="simulateArrivalGeofence()" title="Aracı doğrudan fabrikanın/okulun kapısındaki sanal çite sokar">
-                  <span>🏁 Varış Noktasına Ulaştı (Geofence Kapat)</span>
+                <button class="btn-action secondary" onclick="simulateArrivalGeofence()" title="Aracı doğrudan varış noktasına sokar">
+                  <span>🏁 Varış Noktasına Ulaştı</span>
                 </button>
                 <button class="btn-action secondary" onclick="resetLiveSimulation()" style="font-size:0.75rem; padding: 0.35rem 0.65rem;" title="Simülasyonu başlangıç noktasına sıfırlar">
                   <span>🔄 Başa Sar</span>

@@ -444,6 +444,16 @@
          ========================================================================= -->
     <div id="sectionDriverCockpit" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
       
+      <!-- 1. Sefer İstikameti Seçici (Sabah Toplama vs Akşam Dönüş Dağıtımı) -->
+      <div style="display: flex; gap: 0.5rem; background: rgba(255,255,255,0.04); padding: 0.35rem; border-radius: 12px; border: 1px solid var(--border-color);">
+        <button type="button" class="btn-tab active" id="btnTripMorning" onclick="switchTripMode('morning')" style="flex: 1; padding: 0.65rem; font-size: 0.8rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.2s;">
+          🌅 Sabah: İşe / Okula (Toplama)
+        </button>
+        <button type="button" class="btn-tab" id="btnTripEvening" onclick="switchTripMode('evening')" style="flex: 1; padding: 0.65rem; font-size: 0.8rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">
+          🌇 Akşam: Eve Dönüş (Dağıtım)
+        </button>
+      </div>
+
       <!-- Servis ve Vardiya Saatleri Kartı -->
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -457,6 +467,15 @@
           </div>
         </div>
 
+        <!-- Sefer İstikameti Açıklaması -->
+        <div id="boxTripDirectionInfo" style="margin-top: 0.75rem; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 10px; padding: 0.65rem 0.85rem; font-size: 0.8rem; color: #93c5fd; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.1rem;">🛣️</span>
+          <div>
+            <div style="font-weight: 700; color: #fff;" id="txtTripDirectionTitle">Sabah Seferi: Duraklardan Fabrikaya (Toplama)</div>
+            <div style="font-size: 0.725rem; color: #cbd5e1;" id="txtTripDirectionDesc">Personeller sabah duraklarından sırayla alınır ve fabrikaya ulaştırılır.</div>
+          </div>
+        </div>
+
         <!-- Başlama ve Dönüş Saatleri -->
         <div class="shift-times-box">
           <div class="shift-col" style="border-right: 1px solid rgba(255,255,255,0.06);">
@@ -465,24 +484,34 @@
           </div>
           <div class="shift-col">
             <div class="shift-title">🌇 Akşam Dönüş</div>
-            <div class="shift-val" style="color: #60a5fa;" id="txtShiftReturn">17:30</div>
+            <div class="shift-val" style="color: #60a5fa;" id="txtShiftReturn">16:45</div>
           </div>
         </div>
 
-        <!-- Otomatik Bildirim & Başlatma Durumu -->
-        <div style="margin-top: 0.75rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 0.75rem; font-size: 0.775rem; color: #34d399; display: flex; justify-content: space-between; align-items: center;">
-          <span>⏰ İşe başlama saatinde (07:15) canlı GPS otomatik başlar.</span>
-          <button type="button" class="btn-board waiting" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="triggerSimulatedAutoStart()">
-            ⚡ Saati Simüle Et
-          </button>
+        <!-- Otomatik Bildirim & Başlatma Durumu & Simülasyon -->
+        <div style="margin-top: 0.75rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 0.75rem;">
+          <div style="font-size: 0.75rem; color: #34d399; font-weight: 600; margin-bottom: 0.5rem;" id="txtAutoAlarmHint">
+            ⏰ Sabah (<span id="txtHintMorning">07:15</span>) ve Akşam Dönüş (<span id="txtHintReturn">16:45</span>) saatinde GPS otomatik başlar.
+          </div>
+          <div style="display: flex; gap: 0.4rem;">
+            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem;" onclick="triggerSimulatedAutoStart('morning')">
+              ⚡ Sabahı Simüle Et (<span id="btnSimMornTime">07:15</span>)
+            </button>
+            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem; color: #60a5fa; border-color: rgba(96,165,250,0.4);" onclick="triggerSimulatedAutoStart('evening')">
+              ⚡ Dönüşü Simüle Et (<span id="btnSimRetTime">16:45</span>)
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Dev Canlı Konum Başlat / Durdur Butonu -->
-      <div>
+      <!-- Dev Canlı Konum Başlat / Durdur Butonu & Seferi Bitir -->
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
         <button class="btn-action-gps start" id="btnToggleGps" onclick="toggleDriverGps()">
           <span>📡</span>
           <span id="btnGpsText">CANLI KONUMU BAŞLAT</span>
+        </button>
+        <button class="btn-action-gps stop" id="btnFinishTrip" onclick="handleFinishTripClick()" style="display: none; padding: 0.85rem; font-size: 0.95rem; background: linear-gradient(135deg, #ef4444, #b91c1c); box-shadow: 0 8px 25px rgba(239,68,68,0.35);">
+          <span>🏁 Seferi Bitir / Turu Tamamla</span>
         </button>
       </div>
 
@@ -490,7 +519,7 @@
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <div style="font-size: 0.725rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hedef Varış Noktası</div>
+            <div style="font-size: 0.725rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;" id="lblTargetTitle">Hedef Varış Noktası</div>
             <div style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-top: 0.15rem;" id="txtWorkplaceName">Merkez Fabrika</div>
           </div>
           <span class="status-pill" style="font-size: 0.7rem; color: #f43f5e;" id="txtGeofenceRadius">180m Radar</span>
@@ -515,7 +544,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
           <div>
             <h3 style="font-size: 0.95rem; font-weight: 700; color: #fff;" id="titlePassengerList">👥 Araca Atanan Yolcular</h3>
-            <span style="font-size: 0.725rem; color: var(--text-muted);">Binen yolcuları işaretleyebilirsiniz.</span>
+            <span style="font-size: 0.725rem; color: var(--text-muted);" id="subtitlePassengerList">Binen yolcuları işaretleyebilirsiniz.</span>
           </div>
           <span class="status-pill" style="font-size: 0.7rem; color: #34d399;" id="txtPassengerCount">0 Yolcu</span>
         </div>
@@ -545,7 +574,7 @@
   <div class="arrival-overlay" id="modalArrival">
     <div class="arrival-card">
       <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">🎯</div>
-      <h2 style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">Hedefe Ulaşıldı!</h2>
+      <h2 style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;" id="txtArrivalTitle">Hedefe Ulaşıldı!</h2>
       <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 1.5rem;" id="txtArrivalMsg">
         Fabrika sanal çitine giriş yaptınız. Canlı GPS yayını personeller ve yönetim için otomatik olarak kapatıldı.
       </p>
@@ -561,13 +590,17 @@
   <script>
     let activeShuttle = null;
     let assignedPassengers = [];
+    let activeRoute = null;
+    let firstStop = null;
+    let currentTripType = 'morning'; // 'morning' | 'evening'
     let watchId = null;
     let isTracking = false;
     let driverMap = null;
     let driverMarker = null;
     let accuracyCircle = null;
-    let workplaceCircle = null;
+    let destinationCircle = null;
     let autoClockInterval = null;
+    let simInterval = null;
 
     // Web Audio Beep / Chime
     function playBeep(freq = 600, duration = 0.15) {
@@ -591,8 +624,15 @@
       setTimeout(() => playBeep(783.99, 0.35), 300);
     }
 
+    function playArrivalFanfare() {
+      playBeep(440, 0.12);
+      setTimeout(() => playBeep(554.37, 0.12), 120);
+      setTimeout(() => playBeep(659.25, 0.15), 240);
+      setTimeout(() => playBeep(880, 0.4), 380);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
-      // Daha önce giriş yapılmış mı kontrol et
+      // Oturum kontrolü
       const savedSession = localStorage.getItem('servis360_driver_session');
       if (savedSession) {
         try {
@@ -653,13 +693,14 @@
 
     function handleDriverLogout() {
       if (isTracking) stopTracking();
+      if (simInterval) clearInterval(simInterval);
       localStorage.removeItem('servis360_driver_session');
       activeShuttle = null;
       assignedPassengers = [];
       showLoginScreen();
     }
 
-    function setupDriverDashboard(shuttle, passengers) {
+    async function setupDriverDashboard(shuttle, passengers) {
       activeShuttle = shuttle;
       assignedPassengers = passengers || [];
 
@@ -672,25 +713,114 @@
       document.getElementById('txtActiveCompany').innerText = shuttle.company_name;
       document.getElementById('txtActiveDriver').innerText = shuttle.driver_name || 'Şoför';
       document.getElementById('txtShiftStart').innerText = shuttle.shift_start_time || '07:15';
-      document.getElementById('txtShiftReturn').innerText = shuttle.return_time || '17:30';
-      document.getElementById('txtWorkplaceName').innerText = shuttle.workplace_name || 'Merkez Fabrika';
-      document.getElementById('txtGeofenceRadius').innerText = `${shuttle.geofence_radius_meters || 180}m Çit`;
+      document.getElementById('txtShiftReturn').innerText = shuttle.return_time || '16:45';
+      document.getElementById('btnSimMornTime').innerText = shuttle.shift_start_time || '07:15';
+      document.getElementById('btnSimRetTime').innerText = shuttle.return_time || '16:45';
+      document.getElementById('txtHintMorning').innerText = shuttle.shift_start_time || '07:15';
+      document.getElementById('txtHintReturn').innerText = shuttle.return_time || '16:45';
 
       const isSchool = shuttle.operation_type === 'school';
       document.getElementById('txtOpTypeBadge').innerText = isSchool ? '🎓 Öğrenci Servisi' : '🏢 Personel Servisi';
-      document.getElementById('titlePassengerList').innerText = isSchool ? '🎓 Araca Atanan Öğrenciler' : '👥 Araca Atanan Personeller';
 
-      renderPassengerList();
+      // Sunucudan en güncel rota, duraklar ve saatleri senkronize et
+      await syncShuttleDetailsFromServer();
+
+      // Varsayılan olarak saate göre otomatik sabah veya akşam modunu seç
+      const now = new Date();
+      const curHour = now.getHours();
+      // Saat 12:00'den sonraysa otomatik akşam dönüş moduna hazırla
+      if (curHour >= 12) {
+        switchTripMode('evening');
+      } else {
+        switchTripMode('morning');
+      }
+
       initDriverMap();
       startAutoShiftClockCheck();
+    }
+
+    // Sunucudan en güncel servis, rota ve durak verilerini çek
+    async function syncShuttleDetailsFromServer() {
+      if (!activeShuttle) return;
+      try {
+        const res = await fetch(`/api/shuttle/${activeShuttle.id}/sync`);
+        const data = await res.json();
+        if (data.success) {
+          activeShuttle = { ...activeShuttle, ...data.shuttle };
+          if (data.passengers) assignedPassengers = data.passengers;
+          if (data.route) activeRoute = data.route;
+
+          // Sabah rotasının 1. durağını tespit et
+          if (assignedPassengers && assignedPassengers.length > 0) {
+            const sortedByOrder = [...assignedPassengers].sort((a,b) => (a.stop_order || 99) - (b.stop_order || 99));
+            firstStop = {
+              name: sortedByOrder[0].stop_name || '1. Durak',
+              order: 1
+            };
+          }
+
+          // UI saatlerini tazele
+          document.getElementById('txtShiftStart').innerText = activeShuttle.shift_start_time || '07:15';
+          document.getElementById('txtShiftReturn').innerText = activeShuttle.return_time || '16:45';
+          document.getElementById('btnSimMornTime').innerText = activeShuttle.shift_start_time || '07:15';
+          document.getElementById('btnSimRetTime').innerText = activeShuttle.return_time || '16:45';
+          document.getElementById('txtHintMorning').innerText = activeShuttle.shift_start_time || '07:15';
+          document.getElementById('txtHintReturn').innerText = activeShuttle.return_time || '16:45';
+        }
+      } catch (e) {
+        console.warn('Senkronizasyon hatası:', e);
+      }
+    }
+
+    // Sefer İstikameti Değiştirici (Sabah Toplama vs Akşam Dağıtım)
+    function switchTripMode(mode) {
+      currentTripType = mode;
+      const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
+      const btnMorn = document.getElementById('btnTripMorning');
+      const btnEve = document.getElementById('btnTripEvening');
+
+      if (mode === 'evening') {
+        btnEve.style.background = 'var(--accent-blue)';
+        btnEve.style.color = '#fff';
+        btnMorn.style.background = 'transparent';
+        btnMorn.style.color = 'var(--text-muted)';
+
+        document.getElementById('txtTripDirectionTitle').innerText = 'Akşam Seferi: Fabrikadan Evlere (Dönüş & Dağıtım)';
+        document.getElementById('txtTripDirectionDesc').innerText = 'Araç fabrikadan hareket eder, personelleri/öğrencileri sırayla evlerine bırakır ve sabahki 1. durakta tur biter.';
+        
+        document.getElementById('lblTargetTitle').innerText = 'Hedef (Son Bırakma Durağı)';
+        document.getElementById('txtWorkplaceName').innerText = firstStop ? `${firstStop.name} (Sabahki 1. Durak)` : 'Sabahki 1. Durak (Tur Sonu)';
+        document.getElementById('txtGeofenceRadius').innerText = '250m Radar';
+
+        document.getElementById('titlePassengerList').innerText = isSchool ? '🎓 Öğrenci İndirme & Dağıtım Listesi' : '👥 Personel İndirme & Dağıtım Listesi';
+        document.getElementById('subtitlePassengerList').innerText = 'İnen yolcuları [✓ İndi / Teslim Edildi] olarak işaretleyin.';
+      } else {
+        btnMorn.style.background = 'var(--accent-blue)';
+        btnMorn.style.color = '#fff';
+        btnEve.style.background = 'transparent';
+        btnEve.style.color = 'var(--text-muted)';
+
+        document.getElementById('txtTripDirectionTitle').innerText = 'Sabah Seferi: Duraklardan Fabrikaya (Toplama)';
+        document.getElementById('txtTripDirectionDesc').innerText = 'Personeller sabah duraklarından sırayla alınır ve fabrikaya ulaştırılır.';
+        
+        document.getElementById('lblTargetTitle').innerText = 'Hedef Varış Noktası';
+        document.getElementById('txtWorkplaceName').innerText = activeShuttle.workplace_name || (isSchool ? 'Merkez Okul Kampüsü' : 'Merkez Fabrika');
+        document.getElementById('txtGeofenceRadius').innerText = `${activeShuttle.geofence_radius_meters || 180}m Radar`;
+
+        document.getElementById('titlePassengerList').innerText = isSchool ? '🎓 Araca Atanan Öğrenciler' : '👥 Araca Atanan Personeller';
+        document.getElementById('subtitlePassengerList').innerText = 'Binen yolcuları [✓ Bindi] olarak işaretleyebilirsiniz.';
+      }
+
+      renderPassengerList();
+      updateMapDestinationCircle();
     }
 
     function renderPassengerList() {
       const container = document.getElementById('containerPassengersList');
       const countEl = document.getElementById('txtPassengerCount');
-      countEl.innerText = `${assignedPassengers.length} Yolcu`;
 
-      if (assignedPassengers.length === 0) {
+      if (!assignedPassengers || assignedPassengers.length === 0) {
+        countEl.innerText = '0 Yolcu';
         container.innerHTML = `
           <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1.5rem 0;">
             Bu araca henüz yolcu atanmamış.
@@ -700,56 +830,111 @@
       }
 
       const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
+      const isEvening = currentTripType === 'evening';
 
-      container.innerHTML = assignedPassengers.map(p => {
-        const isBoarded = p.status === 'boarded';
+      // AKŞAM DÖNÜŞÜNDE LİSTEYİ TERS ÇEVİR (Fabrikaya en yakın son duraktakiler önce iner, sabahki 1. durak en son iner!)
+      const displayList = isEvening ? [...assignedPassengers].reverse() : [...assignedPassengers];
+
+      // İstatistik
+      let completedCount = 0;
+      if (isEvening) {
+        completedCount = assignedPassengers.filter(p => p.status === 'dropped_off').length;
+        countEl.innerText = `${completedCount}/${assignedPassengers.length} İndi`;
+      } else {
+        completedCount = assignedPassengers.filter(p => p.status === 'boarded').length;
+        countEl.innerText = `${completedCount}/${assignedPassengers.length} Bindi`;
+      }
+
+      // Erken iniş bildirimi kontrolü: Eğer akşam modunda tüm yolcular indiyse turu bitirme uyarısı ver
+      const allDroppedBanner = (isEvening && completedCount === assignedPassengers.length && assignedPassengers.length > 0)
+        ? `
+          <div style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.35); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.75rem; text-align: center;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #34d399;">🎉 Tüm Yolcular İndirildi!</div>
+            <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 0.2rem;">
+              Erken iniş tamamlandı. Seferi sonlandırmak için "Seferi Bitir" butonuna basabilirsiniz.
+            </div>
+            <button type="button" class="btn-action-gps stop" onclick="handleFinishTripClick()" style="margin-top: 0.5rem; padding: 0.5rem; font-size: 0.8rem; justify-content: center;">
+              🏁 Seferi Hemen Bitir
+            </button>
+          </div>
+        `
+        : '';
+
+      const itemsHtml = displayList.map((p, idx) => {
         const phone = isSchool ? (p.parent_phone || p.phone) : p.phone;
         const subInfo = isSchool 
           ? `Sınıf: ${p.student_class || '-'} • Veli: ${p.parent_name || '-'} (${p.parent_relation || 'Veli'})`
           : `Departman: ${p.department || 'Genel'}`;
 
+        let btnClass = 'waiting';
+        let btnText = '⏳ Bekliyor';
+
+        if (isEvening) {
+          const isDropped = p.status === 'dropped_off';
+          btnClass = isDropped ? 'boarded' : 'waiting';
+          btnText = isDropped ? '✓ İndi / Teslim' : '🚌 Dağıtımda';
+        } else {
+          const isBoarded = p.status === 'boarded';
+          btnClass = isBoarded ? 'boarded' : 'waiting';
+          btnText = isBoarded ? '✓ Bindi' : '⏳ Bekliyor';
+        }
+
+        const dropOrderNum = isEvening ? `${idx + 1}. Bırakma` : `${p.stop_order || (idx + 1)}. Durak`;
+
         return `
           <div class="passenger-item">
             <div style="flex: 1; padding-right: 0.5rem;">
-              <div style="font-size: 0.9rem; font-weight: 700; color: #fff;">${p.full_name}</div>
-              <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.15rem;">${subInfo}</div>
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <span style="font-size: 0.7rem; background: rgba(255,255,255,0.08); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700; color: #94a3b8;">
+                  ${dropOrderNum}
+                </span>
+                <span style="font-size: 0.9rem; font-weight: 700; color: #fff;">${p.full_name}</span>
+              </div>
+              <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.2rem;">${subInfo}</div>
               <div style="font-size: 0.725rem; color: var(--accent-cyan); margin-top: 0.2rem;">
-                📍 ${p.stop_name || 'Durak Belirlenmedi'}
+                📍 ${p.stop_name || 'Durak'}
                 ${phone ? ` • <a href="tel:${phone}" style="color:var(--accent-cyan); text-decoration:none;">📞 ${phone}</a>` : ''}
               </div>
             </div>
             <div>
-              <button class="btn-board ${isBoarded ? 'boarded' : 'waiting'}" onclick="togglePassengerBoarding(${p.id})">
-                ${isBoarded ? '✓ Bindi' : '⏳ Bekliyor'}
+              <button class="btn-board ${btnClass}" onclick="togglePassengerStatus(${p.id})">
+                ${btnText}
               </button>
             </div>
           </div>
         `;
       }).join('');
+
+      container.innerHTML = allDroppedBanner + itemsHtml;
     }
 
-    async function togglePassengerBoarding(passengerId) {
+    async function togglePassengerStatus(passengerId) {
       const p = assignedPassengers.find(x => x.id === passengerId);
       if (!p) return;
 
-      const newStatus = p.status === 'boarded' ? 'waiting' : 'boarded';
-      p.status = newStatus;
-      renderPassengerList();
+      if (currentTripType === 'evening') {
+        // Akşam modunda İndi / Dağıtımda arasında geçiş
+        p.status = p.status === 'dropped_off' ? 'boarded' : 'dropped_off';
+      } else {
+        // Sabah modunda Bindi / Bekliyor arasında geçiş
+        p.status = p.status === 'boarded' ? 'waiting' : 'boarded';
+      }
 
+      renderPassengerList();
       playBeep(isTracking ? 750 : 550, 0.1);
 
       try {
         await fetch(`/api/shuttle/${activeShuttle.id}/passengers/${passengerId}/status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus })
+          body: JSON.stringify({ status: p.status })
         });
       } catch (err) {
         console.warn('Yolcu durumu iletilemedi:', err);
       }
     }
 
-    // PWA Kurulum Olayı Dinleyicisi
+    // PWA Kurulum Olayı
     let deferredInstallPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -773,45 +958,59 @@
       }
     }
 
-    // Vardiya Saati Otomatik Kontrolü (07:15 ve 17:30 olduğunda otomatik alarm + canlı GPS başlatma)
+    // Vardiya Saati Otomatik Kontrolü (07:15 ve 16:45 olduğunda otomatik alarm + GPS başlatma)
     function startAutoShiftClockCheck() {
       if (autoClockInterval) clearInterval(autoClockInterval);
       
-      // Bildirim İzni İste (Web Notification)
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
       }
 
-      autoClockInterval = setInterval(() => {
-        if (isTracking || !activeShuttle) return;
+      autoClockInterval = setInterval(async () => {
+        if (!activeShuttle) return;
+
+        // Her kontrol öncesi saatleri güncel tut
+        await syncShuttleDetailsFromServer();
+
+        if (isTracking) return;
+
         const now = new Date();
         const currentHours = now.getHours().toString().padStart(2, '0');
         const currentMins = now.getMinutes().toString().padStart(2, '0');
         const currentTimeStr = `${currentHours}:${currentMins}`;
 
-        // Başlama saati veya akşam dönüş saati geldiyse otomatik başlat!
-        if (currentTimeStr === activeShuttle.shift_start_time || currentTimeStr === activeShuttle.return_time) {
-          triggerSimulatedAutoStart();
+        // Akşam Dönüş Saati Kontrolü (Örn: 16:45)
+        if (currentTimeStr === activeShuttle.return_time) {
+          triggerSimulatedAutoStart('evening');
         }
-      }, 20000);
+        // Sabah Başlama Saati Kontrolü (Örn: 07:15)
+        else if (currentTimeStr === activeShuttle.shift_start_time) {
+          triggerSimulatedAutoStart('morning');
+        }
+      }, 15000);
     }
 
-    function triggerSimulatedAutoStart() {
-      if (isTracking) return;
+    // Sefer Otomatik / Manuel Alarm ile Başlatma
+    function triggerSimulatedAutoStart(mode = 'morning') {
+      if (isTracking) stopTracking();
+
+      switchTripMode(mode);
       playSuccessChime();
       if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
-      // Web Notification Gönder
+      const timeStr = mode === 'evening' ? (activeShuttle.return_time || '16:45') : (activeShuttle.shift_start_time || '07:15');
+      const modeLabel = mode === 'evening' ? '🌇 AKŞAM DÖNÜŞ (DAĞITIM)' : '🌅 SABAH TOPLAMA';
+
       if ('Notification' in window && Notification.permission === 'granted') {
         try {
-          new Notification("🔔 Servis Saati Geldi!", {
-            body: `${activeShuttle.plate} için sefer saati (${activeShuttle.shift_start_time || '07:15'}). Canlı GPS akışı başlatıldı.`,
+          new Notification(`🔔 ${modeLabel} Saati Geldi!`, {
+            body: `${activeShuttle.plate} için sefer saati (${timeStr}). Canlı GPS yayını başlatıldı.`,
             icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚐</text></svg>"
           });
         } catch (e) {}
       }
 
-      alert(`⏰ SEFER SAATİ GELDİ (${activeShuttle.shift_start_time || '07:15'})!\n\nCanlı GPS konum akışı personeller, öğrenciler ve şirket yönetimi için otomatik olarak başlatıldı.`);
+      alert(`⏰ ${modeLabel} SAATİ GELDİ (${timeStr})!\n\nCanlı GPS konum akışı personeller, veliler ve şirket yönetimi için otomatik olarak başlatıldı.`);
       startTracking();
     }
 
@@ -835,9 +1034,29 @@
         driverMap.invalidateSize();
       }
 
-      if (workplaceCircle) driverMap.removeLayer(workplaceCircle);
-      workplaceCircle = L.circle([targetLat, targetLng], {
-        radius: activeShuttle.geofence_radius_meters || 180,
+      updateMapDestinationCircle();
+    }
+
+    function updateMapDestinationCircle() {
+      if (!driverMap || !activeShuttle) return;
+      if (destinationCircle) driverMap.removeLayer(destinationCircle);
+
+      let targetLat = activeShuttle.workplace_lat || 40.72318;
+      let targetLng = activeShuttle.workplace_lng || 29.493785;
+      let radius = activeShuttle.geofence_radius_meters || 180;
+
+      // Akşam modunda hedef sabahki 1. durak koordinatı (varsa)
+      if (currentTripType === 'evening' && assignedPassengers.length > 0) {
+        const sorted = [...assignedPassengers].sort((a,b) => (a.stop_order || 99) - (b.stop_order || 99));
+        if (sorted[0].lat && sorted[0].lng) {
+          targetLat = sorted[0].lat;
+          targetLng = sorted[0].lng;
+          radius = 250;
+        }
+      }
+
+      destinationCircle = L.circle([targetLat, targetLng], {
+        radius: radius,
         color: '#f43f5e',
         fillColor: '#f43f5e',
         fillOpacity: 0.2,
@@ -853,13 +1072,50 @@
       }
     }
 
+    // Şoför Seferi Bitir Butonuna Bastığında (Kullanıcı Talebi: "şöfor seferi bitir deyince bitirmesi lazım")
+    async function handleFinishTripClick() {
+      const isEvening = currentTripType === 'evening';
+      const promptMsg = isEvening
+        ? "Akşam dönüş seferini tamamlayıp canlı yayını kapatmak istiyor musunuz?"
+        : "Sabah toplama seferini tamamlayıp canlı yayını kapatmak istiyor musunuz?";
+
+      if (!confirm(promptMsg)) return;
+
+      stopTracking();
+      if (simInterval) clearInterval(simInterval);
+
+      try {
+        await fetch(`/api/shuttle/${activeShuttle.id}/finish-trip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trip_type: currentTripType })
+        });
+      } catch (e) {
+        console.warn('Sefer sonlandırma bildirimi iletilemedi:', e);
+      }
+
+      playArrivalFanfare();
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+
+      // Hedefe varış & sefer tamamlama modalı
+      document.getElementById('txtArrivalTitle').innerText = '🏁 Sefer Başarıyla Tamamlandı!';
+      document.getElementById('txtArrivalMsg').innerText = isEvening
+        ? 'Akşam dönüş seferi başarıyla tamamlandı. Tüm yolcular güvenle indirildi, sabahki 1. durağa ulaşıldı ve tur bitirildi.'
+        : `${activeShuttle.workplace_name || 'Hedef'} varış noktasına ulaşıldı. Personeller iş yerine vardı ve sefer tamamlandı.`;
+
+      document.getElementById('modalArrival').style.display = 'flex';
+
+      // Status pill ve buton güncellemesi
+      const pill = document.getElementById('badgeGpsStatus');
+      const pillText = document.getElementById('txtGpsStatus');
+      pill.classList.remove('active');
+      pillText.innerText = 'SEFER TAMAMLANDI';
+      document.getElementById('btnFinishTrip').style.display = 'none';
+      document.getElementById('btnGpsText').innerText = '📡 YENİ SEFER BAŞLAT';
+    }
+
     function startTracking() {
       if (!activeShuttle) return;
-
-      if (!navigator.geolocation) {
-        alert('Tarayıcınız GPS konum servisini desteklemiyor.');
-        return;
-      }
 
       playBeep(880, 0.2);
       if (navigator.vibrate) navigator.vibrate(100);
@@ -867,13 +1123,23 @@
       isTracking = true;
       updateUiTrackingState(true);
 
+      if (!navigator.geolocation) {
+        alert('Cihazınızda GPS bulunamadı, simülasyon koordinatları ile canlı yayın başlatılıyor.');
+        startSimulatedGpsStream();
+        return;
+      }
+
       const options = {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0
       };
 
-      watchId = navigator.geolocation.watchPosition(handleGpsSuccess, handleGpsError, options);
+      watchId = navigator.geolocation.watchPosition(handleGpsSuccess, (err) => {
+        console.warn('GPS donanımı bekleniyor veya simülasyona geçiliyor:', err);
+        // Eğer konum açılamazsa veya masaüstü testindeyse koordinat simülasyonu başlat
+        startSimulatedGpsStream();
+      }, options);
     }
 
     function stopTracking() {
@@ -881,18 +1147,18 @@
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
       }
+      if (simInterval !== null) {
+        clearInterval(simInterval);
+        simInterval = null;
+      }
 
       isTracking = false;
       updateUiTrackingState(false);
       playBeep(440, 0.2);
     }
 
-    async function handleGpsSuccess(pos) {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
-      const accuracy = Math.round(pos.coords.accuracy);
-
+    // Gerçek veya Simüle Edilen GPS Konumunu Sunucuya İlet
+    async function sendGpsLocation(lat, lng, speedKmH = 42, heading = 0, accuracy = 8) {
       document.getElementById('metricSpeed').innerHTML = `${speedKmH} <span style="font-size:0.75rem;">km/s</span>`;
       document.getElementById('metricAccuracy').innerHTML = `±${accuracy} <span style="font-size:0.75rem;">m</span>`;
 
@@ -933,12 +1199,14 @@
             lat: lat,
             lng: lng,
             speed: speedKmH,
-            heading: pos.coords.heading || 0,
-            status: 'running'
+            heading: heading,
+            status: 'running',
+            trip_type: currentTripType // 'evening' veya 'morning'
           })
         });
 
         const data = await res.json();
+        // Dönüşte ilk durağa varıldı mı veya sabah fabrikaya varıldı mı?
         if (data.arrived) {
           triggerArrivalAutomation(data);
         }
@@ -947,24 +1215,79 @@
       }
     }
 
-    function handleGpsError(err) {
-      console.warn('GPS Hatası:', err);
-      document.getElementById('metricAccuracy').innerText = 'GPS Bekleniyor';
+    async function handleGpsSuccess(pos) {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 38;
+      const accuracy = Math.round(pos.coords.accuracy) || 10;
+      await sendGpsLocation(lat, lng, speedKmH, pos.coords.heading || 0, accuracy);
+    }
+
+    // Masaüstü veya Test Sırasında Otomatik Yol Simülasyonu
+    function startSimulatedGpsStream() {
+      if (simInterval) clearInterval(simInterval);
+
+      // Rotanın koordinatlarını belirle
+      let routePoints = [];
+      if (activeRoute && activeRoute.road_geometry && Array.isArray(activeRoute.road_geometry) && activeRoute.road_geometry.length > 0) {
+        routePoints = currentTripType === 'evening'
+          ? [...activeRoute.road_geometry].reverse() // Akşam: Fabrikadan sabahki ilk durağa doğru
+          : [...activeRoute.road_geometry]; // Sabah: İlk duraktan fabrikaya doğru
+      } else {
+        // Yedek koordinatlar (Dilovası - Gebze hattı)
+        const samplePoints = [
+          [40.72318, 29.493785],
+          [40.73012, 29.482011],
+          [40.74230, 29.465100],
+          [40.75540, 29.442100],
+          [40.76890, 29.421500],
+          [40.78120, 29.408200]
+        ];
+        routePoints = currentTripType === 'evening' ? samplePoints : [...samplePoints].reverse();
+      }
+
+      let stepIndex = 0;
+      simInterval = setInterval(async () => {
+        if (!isTracking || stepIndex >= routePoints.length) {
+          clearInterval(simInterval);
+          simInterval = null;
+          return;
+        }
+
+        const pt = routePoints[stepIndex];
+        stepIndex++;
+        await sendGpsLocation(pt[0], pt[1], 45, 90, 6);
+      }, 2500);
     }
 
     function triggerArrivalAutomation(data) {
       stopTracking();
-
+      playArrivalFanfare();
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
-      playSuccessChime();
 
-      const isSchool = data.operation_type === 'school';
-      const msg = isSchool 
-        ? `${data.workplace_name || 'Okul'} sanal çitine giriş yaptınız. Velilere "Öğrenci okula ulaştı" SMS/bildirimi iletildi ve canlı GPS yayını otomatik kapatıldı.`
-        : `${data.workplace_name || 'Fabrika'} sanal çitine giriş yaptınız. Personeller iş yerine vardı ve canlı GPS yayını otomatik kapatıldı.`;
+      const isEvening = data.trip_type === 'evening' || currentTripType === 'evening';
+      const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
 
-      document.getElementById('txtArrivalMsg').innerText = msg;
+      if (isEvening) {
+        // Akşam dönüşünde sabahki 1. durağa varıldı!
+        document.getElementById('txtArrivalTitle').innerText = '🎯 Sabahki 1. Durağa Ulaşıldı!';
+        document.getElementById('txtArrivalMsg').innerText = `Akşam dağıtım seferi başarıyla tamamlandı. Son durağa (${data.reached_stop_name || '1. Durak'}) varıldı, araç park edildi ve tur bitirildi.`;
+      } else {
+        // Sabah toplamasında fabrikaya/okula varıldı!
+        document.getElementById('txtArrivalTitle').innerText = '🎯 Hedefe Ulaşıldı!';
+        document.getElementById('txtArrivalMsg').innerText = isSchool
+          ? `${data.workplace_name || 'Okul'} sanal çitine giriş yaptınız. Velilere "Öğrenci okula ulaştı" bildirimi iletildi ve canlı GPS yayını otomatik kapatıldı.`
+          : `${data.workplace_name || 'Fabrika'} sanal çitine giriş yaptınız. Personeller iş yerine vardı ve canlı GPS yayını otomatik kapatıldı.`;
+      }
+
       document.getElementById('modalArrival').style.display = 'flex';
+
+      const pill = document.getElementById('badgeGpsStatus');
+      const pillText = document.getElementById('txtGpsStatus');
+      pill.classList.remove('active');
+      pillText.innerText = 'TUR TAMAMLANDI';
+      document.getElementById('btnFinishTrip').style.display = 'none';
+      document.getElementById('btnGpsText').innerText = '📡 YENİ SEFER BAŞLAT';
     }
 
     function closeArrivalModal() {
@@ -976,6 +1299,7 @@
       const pillText = document.getElementById('txtGpsStatus');
       const btn = document.getElementById('btnToggleGps');
       const btnText = document.getElementById('btnGpsText');
+      const btnFinish = document.getElementById('btnFinishTrip');
 
       if (active) {
         pill.classList.add('active');
@@ -983,6 +1307,7 @@
         btn.classList.remove('start');
         btn.classList.add('stop');
         btnText.innerText = '🛑 CANLI KONUMU DURDUR';
+        if (btnFinish) btnFinish.style.display = 'flex';
       } else {
         pill.classList.remove('active');
         pillText.innerText = 'BEKLEMEDE';

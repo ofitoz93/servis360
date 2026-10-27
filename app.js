@@ -736,6 +736,29 @@ function setupLiveMapOrEmptyState() {
   }
 }
 
+let currentLiveDirection = 'morning'; // 'morning' | 'evening'
+
+function setLiveMapDirection(dir) {
+  currentLiveDirection = dir;
+  const btnMorn = document.getElementById('btnLiveDirMorning');
+  const btnEve = document.getElementById('btnLiveDirEvening');
+
+  if (dir === 'evening') {
+    if (btnEve) { btnEve.className = 'btn-action primary'; }
+    if (btnMorn) { btnMorn.className = 'btn-action secondary'; }
+    showToast("🌇 Akşam Dönüş Modu", "Güzergah fabrikadan başlayıp sabahki 1. durağa doğru ters istikamete çevrildi.", "info");
+  } else {
+    if (btnMorn) { btnMorn.className = 'btn-action primary'; }
+    if (btnEve) { btnEve.className = 'btn-action secondary'; }
+    showToast("🌅 Sabah Toplama Modu", "Güzergah duraklardan fabrikaya doğru ayarlandı.", "info");
+  }
+
+  resetLiveSimulation();
+  if (state.activeCompanyData) {
+    initLiveMapWithCompanyRoutes(state.activeCompanyData, state.activeRouteId);
+  }
+}
+
 function onLiveMapRouteChange(routeId) {
   state.activeRouteId = parseInt(routeId);
   resetLiveSimulation();
@@ -765,7 +788,8 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
     const distText = currentRoute.total_distance_km ? `${currentRoute.total_distance_km} km` : 'Hesaplanıyor';
     const durText = currentRoute.total_duration_mins ? `~${currentRoute.total_duration_mins} dk` : '';
     const plateText = matchedShuttle ? `🚐 ${matchedShuttle.plate} (${matchedShuttle.driver_name || 'Şoför'})` : 'Servis';
-    metaEl.innerHTML = `🛣️ <b>${currentRoute.route_name}</b> • ${distText} ${durText} • 📍 ${routeStops.length} Durak • ${plateText}`;
+    const dirText = currentLiveDirection === 'evening' ? '🌇 Akşam: Fabrikadan ➔ 1. Durağa (Dağıtım)' : '🌅 Sabah: 1. Duraktan ➔ Fabrikaya (Toplama)';
+    metaEl.innerHTML = `🛣️ <b>${currentRoute.route_name}</b> [${dirText}] • ${distText} ${durText} • 📍 ${routeStops.length} Durak • ${plateText}`;
   }
 
   if (!liveMap) {
@@ -802,7 +826,7 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
   });
 
   L.marker(targetCoord, { icon: targetIcon })
-    .bindPopup(`<b>${comp.workplace_name}</b><br>${isSchool ? 'Hedef Okul Kampüsü' : 'Hedef Fabrika / Tesis'}`)
+    .bindPopup(`<b>${comp.workplace_name}</b><br>${isSchool ? 'Okul Kampüsü' : 'Fabrika / Tesis'}`)
     .addTo(liveMap);
 
   // 2. Durakları Çiz
@@ -815,25 +839,28 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
     });
 
     const m = L.marker([st.lat, st.lng], { icon: stopIcon })
-      .bindPopup(`<b>${st.stop_name}</b><br>Biniş Saati: ${st.eta_time}`)
+      .bindPopup(`<b>${st.stop_name}</b><br>Biniş/İniş Saati: ${st.eta_time}`)
       .addTo(liveMap);
 
     liveMapStopMarkers.push(m);
   });
 
-  // 3. Gerçek Yollardan Geçen Çizgiyi Çiz
+  // 3. Gerçek Yollardan Geçen Çizgiyi Çiz (Akşam ise ters çevir!)
   let roadPoints = [];
   if (currentRoute.road_geometry && Array.isArray(currentRoute.road_geometry) && currentRoute.road_geometry.length > 0) {
-    roadPoints = currentRoute.road_geometry;
+    roadPoints = currentLiveDirection === 'evening' 
+      ? [...currentRoute.road_geometry].reverse() 
+      : [...currentRoute.road_geometry];
   } else {
-    roadPoints = routeStops.map(s => [s.lat, s.lng]);
-    roadPoints.push(targetCoord);
+    const basePts = routeStops.map(s => [s.lat, s.lng]);
+    basePts.push(targetCoord);
+    roadPoints = currentLiveDirection === 'evening' ? [...basePts].reverse() : basePts;
   }
   currentLiveRoadPoints = roadPoints;
 
   if (roadPoints.length > 1) {
     liveMapPolyline = L.polyline(roadPoints, {
-      color: '#3b82f6',
+      color: currentLiveDirection === 'evening' ? '#0ea5e9' : '#3b82f6',
       weight: 5,
       opacity: 0.85
     }).addTo(liveMap);
@@ -851,7 +878,7 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
   });
 
   liveMapShuttleMarker = L.marker(shuttleStart, { icon: shuttleIcon })
-    .bindPopup(`<b>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</b><br>Şoför: ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'}<br>Kapasite: ${matchedShuttle ? matchedShuttle.capacity : 24} Kişi`)
+    .bindPopup(`<b>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</b><br>Şoför: ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'}<br>İstikamet: ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}`)
     .addTo(liveMap);
 
   setTimeout(() => {
@@ -861,14 +888,21 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
   startRealGpsPolling();
 }
 
-// Canlı Takip Simülasyonu (Yollar Boyunca Pürüzsüz İlerleme)
-function simulateMethodBAutoStart() {
+// Canlı Takip Simülasyonu
+function simulateMethodBAutoStart(mode = 'morning') {
   if (!liveMapShuttleMarker) return;
+  if (mode !== currentLiveDirection) {
+    setLiveMapDirection(mode);
+  }
+
   state.isLive = true;
   state.simulationStep = 0;
   const markerEl = document.getElementById('liveShuttleMarkerEl');
   if (markerEl) markerEl.classList.add('active-pulse');
-  showToast("⚡ Yöntem B Devrede", "Servis saati (07:15) geldi. Şoför telefona dokunmasa bile canlı GPS akışı başladı.", "warning");
+
+  const timeStr = mode === 'evening' ? '16:45' : '07:15';
+  const label = mode === 'evening' ? 'Akşam Dönüş (16:45)' : 'Sabah Başlama (07:15)';
+  showToast(`⚡ ${label} Devrede`, `Sefer saati (${timeStr}) geldi. Şoför telefona dokunmasa bile canlı GPS akışı başladı.`, "warning");
 }
 
 function toggleAutoDrive() {
@@ -882,11 +916,12 @@ function toggleAutoDrive() {
   }
 
   if (!state.isLive) {
-    simulateMethodBAutoStart();
+    simulateMethodBAutoStart(currentLiveDirection);
   }
 
   if (btnText) btnText.innerText = '⏸️ Sürüşü Duraklat';
-  showToast("Canlı Sürüş Başladı", "Araç gerçek virajlar boyunca hedefe doğru ilerliyor...", "success");
+  const dirName = currentLiveDirection === 'evening' ? 'sabahki 1. durağa (eve dönüş)' : 'fabrikaya';
+  showToast("Canlı Sürüş Başladı", `Araç gerçek virajlar boyunca ${dirName} doğru ilerliyor...`, "success");
 
   autoDriveInterval = setInterval(() => {
     const reachedEnd = stepShuttleProgress(true);
@@ -902,7 +937,6 @@ function stepShuttleProgress(isAuto = false) {
   if (!liveMap || !liveMapShuttleMarker || currentLiveRoadPoints.length === 0) return true;
 
   const totalPoints = currentLiveRoadPoints.length;
-  // Manuel tıklandığında %8 atlar, otomatik sürüşte %3 veya 15 adım atlar
   const jump = isAuto ? Math.max(3, Math.floor(totalPoints / 30)) : Math.max(10, Math.floor(totalPoints / 12));
 
   if (state.simulationStep < totalPoints - 1) {
@@ -916,7 +950,7 @@ function stepShuttleProgress(isAuto = false) {
       return true;
     } else {
       if (!isAuto) {
-        showToast("GPS Akışı", `Servis gerçek yol güzergahında ilerliyor (%${Math.round((state.simulationStep / totalPoints) * 100)}).`, "info");
+        showToast("GPS Akışı", `Servis güzergahta ilerliyor (%${Math.round((state.simulationStep / totalPoints) * 100)}).`, "info");
       }
       return false;
     }
@@ -945,7 +979,7 @@ function resetLiveSimulation() {
 
   const markerEl = document.getElementById('liveShuttleMarkerEl');
   if (markerEl) markerEl.classList.remove('active-pulse');
-  showToast("Sıfırlandı", "Servis başlangıç durağına geri çekildi.", "info");
+  showToast("Sıfırlandı", "Servis rotanın başlangıç noktasına geri çekildi.", "info");
 }
 
 function simulateArrivalGeofence() {
@@ -958,22 +992,31 @@ function simulateArrivalGeofence() {
 
   if (!liveMap || !liveMapShuttleMarker || !state.activeCompanyData) return;
   const comp = state.activeCompanyData.company;
-  const targetCoord = [comp.workplace_lat, comp.workplace_lng];
   const isSchool = comp.operation_type === 'school';
+  const isEvening = currentLiveDirection === 'evening';
 
-  liveMapShuttleMarker.setLatLng(targetCoord);
-  liveMap.setView(targetCoord, 14);
+  const endCoord = currentLiveRoadPoints[currentLiveRoadPoints.length - 1];
+  liveMapShuttleMarker.setLatLng(endCoord);
+  liveMap.setView(endCoord, 14);
   state.isLive = false;
   state.simulationStep = currentLiveRoadPoints.length - 1;
 
   const markerEl = document.getElementById('liveShuttleMarkerEl');
   if (markerEl) markerEl.classList.remove('active-pulse');
 
-  showToast(
-    "🎯 Varış Noktasına Ulaştı",
-    `${comp.workplace_name} sanal çitine girildi. ${isSchool ? 'Velilere "Öğrenci okula ulaştı" bildirimi iletildi.' : 'Personeller iş yerine vardı.'} Canlı GPS yayını kapatıldı.`,
-    "success"
-  );
+  if (isEvening) {
+    showToast(
+      "🎯 Sabahki 1. Durağa Ulaşıldı (Tur Tamamlandı)",
+      `Akşam dağıtım seferi başarıyla tamamlandı. Son durağa (${comp.workplace_name} dönüş hattı) ulaşıldı, tüm personeller indi ve tur bitti.`,
+      "success"
+    );
+  } else {
+    showToast(
+      "🎯 Varış Noktasına Ulaştı",
+      `${comp.workplace_name} sanal çitine girildi. ${isSchool ? 'Velilere "Öğrenci okula ulaştı" bildirimi iletildi.' : 'Personeller iş yerine vardı.'} Canlı GPS yayını kapatıldı.`,
+      "success"
+    );
+  }
 }
 
 // Telefondan Canlı Şoför GPS Takip Yoklayıcısı (Polling)

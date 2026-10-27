@@ -493,7 +493,7 @@ app.get('/api/shuttles/available', async (req, res) => {
 // Şoförün telefonundan anlık GPS konumu alma (Mobile -> Server)
 app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
   const { shuttleId } = req.params;
-  const { lat, lng, speed, heading, status } = req.body;
+  const { lat, lng, speed, heading, status, trip_type } = req.body;
 
   try {
     const updateRes = await pool.query(`
@@ -508,20 +508,55 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
     }
 
     const shuttle = updateRes.rows[0];
-
-    // Geofence kontrolü (Fabrika/Okul çitine girdi mi?)
     const compRes = await pool.query('SELECT * FROM companies WHERE id = $1', [shuttle.company_id]);
     let arrived = false;
-    let workplace = null;
+    let workplace = compRes.rows.length > 0 ? compRes.rows[0] : null;
+    let reachedStopName = null;
 
-    if (compRes.rows.length > 0) {
-      workplace = compRes.rows[0];
+    // 1. AKŞAM DÖNÜŞ SEFERİ: Hedef sabahki 1. durak (rotanın ilk durağı / son bırakma durağı)
+    if (trip_type === 'evening') {
+      const firstStopRes = await pool.query(`
+        SELECT st.* 
+        FROM stops st
+        JOIN routes r ON st.route_id = r.id
+        WHERE r.shuttle_id = $1
+        ORDER BY st.stop_order ASC
+        LIMIT 1
+      `, [shuttleId]);
+
+      if (firstStopRes.rows.length > 0) {
+        const firstStop = firstStopRes.rows[0];
+        const targetLat = firstStop.lat;
+        const targetLng = firstStop.lng;
+        const radiusMeters = 250; // 250 metre varış çiti
+
+        // Haversine hesaplama
+        const R = 6371e3;
+        const phi1 = lat * Math.PI / 180;
+        const phi2 = targetLat * Math.PI / 180;
+        const deltaPhi = (targetLat - lat) * Math.PI / 180;
+        const deltaLambda = (targetLng - lng) * Math.PI / 180;
+        const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                  Math.cos(phi1) * Math.cos(phi2) *
+                  Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+
+        if (distance <= radiusMeters) {
+          arrived = true;
+          reachedStopName = firstStop.stop_name || 'Sabahki 1. Durak';
+          await pool.query("UPDATE shuttles SET current_status = 'completed' WHERE id = $1", [shuttleId]);
+        }
+      }
+    } 
+    // 2. SABAH TOPLAMA SEFERİ: Hedef Fabrika / Okul varış noktası
+    else if (workplace) {
       const targetLat = workplace.workplace_lat;
       const targetLng = workplace.workplace_lng;
       const radiusMeters = workplace.geofence_radius_meters || 180;
 
-      // Haversine mesafe hesabı (metre cinsinden)
-      const R = 6371e3; // metre
+      // Haversine mesafe hesabı
+      const R = 6371e3;
       const phi1 = lat * Math.PI / 180;
       const phi2 = targetLat * Math.PI / 180;
       const deltaPhi = (targetLat - lat) * Math.PI / 180;
@@ -534,6 +569,7 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
 
       if (distance <= radiusMeters) {
         arrived = true;
+        reachedStopName = workplace.workplace_name;
         await pool.query("UPDATE shuttles SET current_status = 'arrived' WHERE id = $1", [shuttleId]);
       }
     }
@@ -541,8 +577,78 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
     res.json({
       success: true,
       arrived,
+      trip_type: trip_type || 'morning',
+      reached_stop_name: reachedStopName,
       workplace_name: workplace ? workplace.workplace_name : null,
       operation_type: workplace ? workplace.operation_type : 'personnel'
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Şoförün seferi manuel olarak bitirmesi ("Seferi Bitir" butonu)
+app.post('/api/shuttle/:shuttleId/finish-trip', async (req, res) => {
+  const { shuttleId } = req.params;
+  const { trip_type } = req.body;
+  try {
+    const updateRes = await pool.query(`
+      UPDATE shuttles 
+      SET current_status = 'completed'
+      WHERE id = $1
+      RETURNING *
+    `, [shuttleId]);
+
+    res.json({
+      success: true,
+      message: 'Sefer başarıyla tamamlandı ve kapatıldı.',
+      trip_type: trip_type || 'morning',
+      shuttle: updateRes.rows[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Şoför kokpiti için en güncel servis, sefer saatleri, güzergah ve yolcu senkronizasyonu
+app.get('/api/shuttle/:shuttleId/sync', async (req, res) => {
+  const { shuttleId } = req.params;
+  try {
+    const shuttleRes = await pool.query(`
+      SELECT s.*, 
+             c.company_name, c.workplace_name, c.workplace_lat, c.workplace_lng, c.geofence_radius_meters, c.operation_type
+      FROM shuttles s
+      JOIN companies c ON s.company_id = c.id
+      WHERE s.id = $1
+    `, [shuttleId]);
+
+    if (shuttleRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Servis bulunamadı' });
+    }
+
+    const shuttle = shuttleRes.rows[0];
+
+    // Yolcuları getir
+    const passRes = await pool.query(`
+      SELECT e.*, st.stop_name, st.stop_order, st.eta_time
+      FROM employees e
+      LEFT JOIN stops st ON e.stop_id = st.id
+      WHERE e.shuttle_id = $1
+      ORDER BY COALESCE(st.stop_order, 999) ASC, e.id ASC
+    `, [shuttleId]);
+
+    // Servise ait rotayı getir
+    const routeRes = await pool.query(`
+      SELECT * FROM routes WHERE shuttle_id = $1 ORDER BY id DESC LIMIT 1
+    `, [shuttleId]);
+
+    res.json({
+      success: true,
+      shuttle,
+      passengers: passRes.rows,
+      route: routeRes.rows[0] || null
     });
   } catch (err) {
     console.error(err);
