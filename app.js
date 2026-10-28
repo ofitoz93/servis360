@@ -360,6 +360,13 @@ function navigateTo(viewName) {
     subHeadingEl.innerText = 'Yollar üzerinde anlık canlı GPS akışı ve geofence otomasyonu';
 
     setupLiveMapOrEmptyState();
+  } else if (viewName === 'companyTrips') {
+    document.getElementById('btnNavCompanyTrips').classList.add('active');
+    document.getElementById('viewCompanyTrips').classList.add('active');
+    headingEl.innerText = 'Sefer Kayıtları & Yıllık Sefer Arşivi';
+    subHeadingEl.innerText = 'Araçların gün bazında kalkış saati, varış saati, toplam sürüş süresi ve durak tamamlanma raporları';
+
+    loadCompanyTrips();
   } else if (viewName === 'companyIntegration') {
     document.getElementById('btnNavCompanyIntegration').classList.add('active');
     document.getElementById('viewCompanyIntegration').classList.add('active');
@@ -878,7 +885,8 @@ function setupLiveMapOrEmptyState() {
   }
 }
 
-let currentLiveDirection = 'morning'; // 'morning' | 'evening'
+const curHourNow = new Date().getHours();
+let currentLiveDirection = curHourNow >= 12 ? 'evening' : 'morning'; // Saat 12:00'den sonraysa otomatik akşam, öncesiyse sabah
 
 function setLiveMapDirection(dir) {
   currentLiveDirection = dir;
@@ -888,7 +896,7 @@ function setLiveMapDirection(dir) {
   if (dir === 'evening') {
     if (btnEve) { btnEve.className = 'btn-action primary'; }
     if (btnMorn) { btnMorn.className = 'btn-action secondary'; }
-    showToast("🌇 Akşam Dönüş Modu", "Güzergah fabrikadan başlayıp sabahki 1. durağa doğru ters istikamete çevrildi.", "info");
+    showToast("🌇 Akşam Dağıtım Modu", "Güzergah fabrikadan başlayıp sabahki 1. durağa doğru ters istikamete çevrildi.", "info");
   } else {
     if (btnMorn) { btnMorn.className = 'btn-action primary'; }
     if (btnEve) { btnEve.className = 'btn-action secondary'; }
@@ -1054,52 +1062,54 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
 
   if (roadPoints.length > 1) {
     liveMapPolyline = L.polyline(roadPoints, {
-      color: currentLiveDirection === 'evening' ? '#0ea5e9' : '#3b82f6',
+      color: currentLiveDirection === 'evening' ? '#f59e0b' : '#3b82f6',
       weight: 5,
-      opacity: 0.85
+      opacity: 0.9,
+      dashArray: currentLiveDirection === 'evening' ? '12, 6' : null
     }).addTo(liveMap);
 
     liveMap.fitBounds(liveMapPolyline.getBounds(), { padding: [40, 40] });
   }
 
-  // 4. Servis Aracını Başlangıç Noktasına veya Son Canlı Konumuna Yerleştir
-  const shuttleStart = (matchedShuttle && matchedShuttle.last_lat && matchedShuttle.last_lng) 
-    ? [matchedShuttle.last_lat, matchedShuttle.last_lng] 
-    : (roadPoints[0] || targetCoord);
-
+  // 4. Servis Aracını Sadece Gerçek Koordinatı Varsa Haritaya Yerleştir (Asla 1. durağa uydurma konum atamaz!)
+  const hasRealCoords = matchedShuttle && matchedShuttle.last_lat && matchedShuttle.last_lng;
   const isRunning = matchedShuttle && matchedShuttle.current_status === 'running';
-  const shuttleIcon = L.divIcon({
-    className: 'custom-pin',
-    html: `<div class="shuttle-marker-icon ${isRunning ? 'active-pulse' : ''}" id="liveShuttleMarkerEl" style="${isRunning ? 'border: 2px solid #10b981; background: #064e3b;' : ''}">
-      🚐
-      <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; background: #0f172a; padding: 2px 6px; border-radius: 6px; border: 1px solid ${isRunning ? '#10b981' : '#3b82f6'}; color: ${isRunning ? '#34d399' : '#fff'}; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-        ${matchedShuttle ? matchedShuttle.plate : 'Servis'} ${isRunning ? '🟢 CANLI' : ''}
-      </div>
-    </div>`,
-    iconSize: [38, 38],
-    iconAnchor: [19, 19]
-  });
 
-  const matchedRouteObj = data.routes.find(r => r.id === targetRouteId);
-  const routeDistStr = matchedRouteObj && matchedRouteObj.total_distance_km ? ` (~${matchedRouteObj.total_distance_km} km)` : '';
-
-  liveMapShuttleMarker = L.marker(shuttleStart, { icon: shuttleIcon })
-    .bindPopup(`
-      <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:200px;">
-        <div style="font-size:13px; font-weight:800; color:#fff; display:flex; align-items:center; gap:6px;">
-          <span>🚐</span> <span>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</span>
-          ${isRunning ? '<span style="font-size:10px; color:#34d399; background:rgba(16,185,129,0.2); padding:1px 6px; border-radius:4px; font-weight:700;">CANLI</span>' : ''}
+  if (hasRealCoords) {
+    const shuttleStart = [parseFloat(matchedShuttle.last_lat), parseFloat(matchedShuttle.last_lng)];
+    const shuttleIcon = L.divIcon({
+      className: 'custom-pin',
+      html: `<div class="shuttle-marker-icon ${isRunning ? 'active-pulse' : ''}" id="liveShuttleMarkerEl" style="${isRunning ? 'border: 2px solid #10b981; background: #064e3b;' : ''}">
+        🚐
+        <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; background: #0f172a; padding: 2px 6px; border-radius: 6px; border: 1px solid ${isRunning ? '#10b981' : '#3b82f6'}; color: ${isRunning ? '#34d399' : '#fff'}; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+          ${matchedShuttle ? matchedShuttle.plate : 'Servis'} ${isRunning ? '🟢 CANLI' : ''}
         </div>
-        <div style="font-size:11px; color:#cbd5e1; margin-top:5px;"><b>Şoför:</b> ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'} (${matchedShuttle ? (matchedShuttle.driver_phone || '-') : ''})</div>
-        <div style="font-size:11px; color:#cbd5e1;"><b>Rota:</b> ${matchedRouteObj ? matchedRouteObj.route_name : 'Aktif Rota'}${routeDistStr}</div>
-        <div style="font-size:11px; color:#cbd5e1;"><b>Durak Sayısı:</b> ${routeStops.length} Durak</div>
-        <div style="font-size:11px; color:#cbd5e1;"><b>İstikamet:</b> ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}</div>
-        <button type="button" class="btn-action secondary" onclick="showShuttleRouteOnLiveMap('all')" style="width:100%; margin-top:8px; padding:6px; font-size:11px; justify-content:center; cursor:pointer;">
-          🌐 Tüm Filo Görünümüne Dön
-        </button>
-      </div>
-    `)
-    .addTo(liveMap);
+      </div>`,
+      iconSize: [38, 38],
+      iconAnchor: [19, 19]
+    });
+
+    const matchedRouteObj = data.routes.find(r => r.id === targetRouteId);
+    const routeDistStr = matchedRouteObj && matchedRouteObj.total_distance_km ? ` (~${matchedRouteObj.total_distance_km} km)` : '';
+
+    liveMapShuttleMarker = L.marker(shuttleStart, { icon: shuttleIcon })
+      .bindPopup(`
+        <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:200px;">
+          <div style="font-size:13px; font-weight:800; color:#fff; display:flex; align-items:center; gap:6px;">
+            <span>🚐</span> <span>${matchedShuttle ? matchedShuttle.plate : 'Servis'}</span>
+            ${isRunning ? '<span style="font-size:10px; color:#34d399; background:rgba(16,185,129,0.2); padding:1px 6px; border-radius:4px; font-weight:700;">CANLI</span>' : ''}
+          </div>
+          <div style="font-size:11px; color:#cbd5e1; margin-top:5px;"><b>Şoför:</b> ${matchedShuttle ? matchedShuttle.driver_name : 'Atanmadı'} (${matchedShuttle ? (matchedShuttle.driver_phone || '-') : ''})</div>
+          <div style="font-size:11px; color:#cbd5e1;"><b>Rota:</b> ${matchedRouteObj ? matchedRouteObj.route_name : 'Aktif Rota'}${routeDistStr}</div>
+          <div style="font-size:11px; color:#cbd5e1;"><b>Durak Sayısı:</b> ${routeStops.length} Durak</div>
+          <div style="font-size:11px; color:#cbd5e1;"><b>İstikamet:</b> ${currentLiveDirection === 'evening' ? 'Akşam Dönüşü (Fabrika ➔ Evler)' : 'Sabah Servisi (Evler ➔ Fabrika)'}</div>
+          <button type="button" class="btn-action secondary" onclick="showShuttleRouteOnLiveMap('all')" style="width:100%; margin-top:8px; padding:6px; font-size:11px; justify-content:center; cursor:pointer;">
+            🌐 Tüm Filo Görünümüne Dön
+          </button>
+        </div>
+      `)
+      .addTo(liveMap);
+  }
 
   setTimeout(() => {
     if (liveMap) liveMap.invalidateSize();
@@ -1108,138 +1118,29 @@ function initLiveMapWithCompanyRoutes(data, targetRouteId) {
   startRealGpsPolling();
 }
 
-// Canlı Takip Simülasyonu
-function simulateMethodBAutoStart(mode = 'morning') {
-  if (!liveMapShuttleMarker) return;
-  if (mode !== currentLiveDirection) {
-    setLiveMapDirection(mode);
-  }
+// Demo simülasyonları kaldırıldı - Yalnızca gerçek telefon GPS yayını çalışır
+state.liveFleetFilter = 'running'; // 'running' (sadece seferdekiler) veya 'all' (tüm filo)
+state.lastFleetShuttles = [];
 
-  state.isLive = true;
-  state.simulationStep = 0;
-  const markerEl = document.getElementById('liveShuttleMarkerEl');
-  if (markerEl) markerEl.classList.add('active-pulse');
-
-  const timeStr = mode === 'evening' ? '16:45' : '07:15';
-  const label = mode === 'evening' ? 'Akşam Dönüş (16:45)' : 'Sabah Başlama (07:15)';
-  showToast(`⚡ ${label} Devrede`, `Sefer saati (${timeStr}) geldi. Şoför telefona dokunmasa bile canlı GPS akışı başladı.`, "warning");
-}
-
-function toggleAutoDrive() {
-  const btnText = document.getElementById('txtToggleAutoDrive');
-  if (autoDriveInterval) {
-    clearInterval(autoDriveInterval);
-    autoDriveInterval = null;
-    if (btnText) btnText.innerText = '▶️ Canlı Sürüşü Başlat';
-    showToast("Sürüş Duraklatıldı", "Canlı simülasyon beklemeye alındı.", "info");
-    return;
-  }
-
-  if (!state.isLive) {
-    simulateMethodBAutoStart(currentLiveDirection);
-  }
-
-  if (btnText) btnText.innerText = '⏸️ Sürüşü Duraklat';
-  const dirName = currentLiveDirection === 'evening' ? 'sabahki 1. durağa (eve dönüş)' : 'fabrikaya';
-  showToast("Canlı Sürüş Başladı", `Araç gerçek virajlar boyunca ${dirName} doğru ilerliyor...`, "success");
-
-  autoDriveInterval = setInterval(() => {
-    const reachedEnd = stepShuttleProgress(true);
-    if (reachedEnd) {
-      clearInterval(autoDriveInterval);
-      autoDriveInterval = null;
-      if (btnText) btnText.innerText = '▶️ Canlı Sürüşü Başlat';
-    }
-  }, 450);
-}
-
-function stepShuttleProgress(isAuto = false) {
-  if (!liveMap || !liveMapShuttleMarker || currentLiveRoadPoints.length === 0) return true;
-
-  const totalPoints = currentLiveRoadPoints.length;
-  const jump = isAuto ? Math.max(3, Math.floor(totalPoints / 30)) : Math.max(10, Math.floor(totalPoints / 12));
-
-  if (state.simulationStep < totalPoints - 1) {
-    state.simulationStep = Math.min(state.simulationStep + jump, totalPoints - 1);
-    const targetCoord = currentLiveRoadPoints[state.simulationStep];
-    liveMapShuttleMarker.setLatLng(targetCoord);
-    liveMap.panTo(targetCoord);
-
-    if (state.simulationStep >= totalPoints - 1) {
-      simulateArrivalGeofence();
-      return true;
+window.setFleetLiveFilter = function(filter) {
+  state.liveFleetFilter = filter;
+  const btnRunning = document.getElementById('btnFleetFilterRunning');
+  const btnAll = document.getElementById('btnFleetFilterAll');
+  if (btnRunning && btnAll) {
+    if (filter === 'running') {
+      btnRunning.className = 'btn-action primary';
+      btnAll.className = 'btn-action secondary';
     } else {
-      if (!isAuto) {
-        showToast("GPS Akışı", `Servis güzergahta ilerliyor (%${Math.round((state.simulationStep / totalPoints) * 100)}).`, "info");
-      }
-      return false;
+      btnRunning.className = 'btn-action secondary';
+      btnAll.className = 'btn-action primary';
     }
-  } else {
-    simulateArrivalGeofence();
-    return true;
   }
-}
-
-function resetLiveSimulation() {
-  if (autoDriveInterval) {
-    clearInterval(autoDriveInterval);
-    autoDriveInterval = null;
-    const btnText = document.getElementById('txtToggleAutoDrive');
-    if (btnText) btnText.innerText = '▶️ Canlı Sürüşü Başlat';
+  if (state.lastFleetShuttles && state.lastFleetShuttles.length > 0) {
+    renderFleetLiveCards(state.lastFleetShuttles);
   }
+};
 
-  state.simulationStep = 0;
-  state.isLive = false;
-
-  if (liveMap && liveMapShuttleMarker && currentLiveRoadPoints.length > 0) {
-    const startCoord = currentLiveRoadPoints[0];
-    liveMapShuttleMarker.setLatLng(startCoord);
-    liveMap.setView(startCoord, 13);
-  }
-
-  const markerEl = document.getElementById('liveShuttleMarkerEl');
-  if (markerEl) markerEl.classList.remove('active-pulse');
-  showToast("Sıfırlandı", "Servis rotanın başlangıç noktasına geri çekildi.", "info");
-}
-
-function simulateArrivalGeofence() {
-  if (autoDriveInterval) {
-    clearInterval(autoDriveInterval);
-    autoDriveInterval = null;
-    const btnText = document.getElementById('txtToggleAutoDrive');
-    if (btnText) btnText.innerText = '▶️ Canlı Sürüşü Başlat';
-  }
-
-  if (!liveMap || !liveMapShuttleMarker || !state.activeCompanyData) return;
-  const comp = state.activeCompanyData.company;
-  const isSchool = comp.operation_type === 'school';
-  const isEvening = currentLiveDirection === 'evening';
-
-  const endCoord = currentLiveRoadPoints[currentLiveRoadPoints.length - 1];
-  liveMapShuttleMarker.setLatLng(endCoord);
-  liveMap.setView(endCoord, 14);
-  state.isLive = false;
-  state.simulationStep = currentLiveRoadPoints.length - 1;
-
-  const markerEl = document.getElementById('liveShuttleMarkerEl');
-  if (markerEl) markerEl.classList.remove('active-pulse');
-
-  if (isEvening) {
-    showToast(
-      "🎯 Sabahki 1. Durağa Ulaşıldı (Tur Tamamlandı)",
-      `Akşam dağıtım seferi başarıyla tamamlandı. Son durağa (${comp.workplace_name} dönüş hattı) ulaşıldı, tüm personeller indi ve tur bitti.`,
-      "success"
-    );
-  } else {
-    showToast(
-      "🎯 Varış Noktasına Ulaştı",
-      `${comp.workplace_name} sanal çitine girildi. ${isSchool ? 'Velilere "Öğrenci okula ulaştı" bildirimi iletildi.' : 'Personeller iş yerine vardı.'} Canlı GPS yayını kapatıldı.`,
-      "success"
-    );
-  }
-}
-
-// Telefondan Canlı Şoför GPS Takip Yoklayıcısı (Polling - Tüm Şirket Filosunu İzler)
+// Telefondan Canlı Şoför GPS Takip Yoklayıcısı (Polling - Sadece Canlı Seferdeki Araçları İzler)
 let realGpsPollingInterval = null;
 
 function startRealGpsPolling() {
@@ -1285,8 +1186,18 @@ function startRealGpsPolling() {
               }
             }
           } else {
-            // TÜM şirket araçlarını haritada ayrı pinler olarak göster! ("Araçlar Nerede" görünümü)
+            // TÜM şirket araçlarını haritada gösterme modu
             const isOtherRunning = s.current_status === 'running';
+
+            // Eğer sadece canlı araçlar filtresi seçiliyse ve araç seferde değilse haritada gösterme!
+            if (state.liveFleetFilter === 'running' && !isOtherRunning) {
+              if (allCompanyShuttleMarkers[s.id]) {
+                liveMap.removeLayer(allCompanyShuttleMarkers[s.id]);
+                delete allCompanyShuttleMarkers[s.id];
+              }
+              return;
+            }
+
             const isArrived = s.current_status === 'arrived' || s.current_status === 'completed';
             const statusColor = isOtherRunning ? '#10b981' : (isArrived ? '#3b82f6' : '#64748b');
 
@@ -1358,13 +1269,36 @@ function startRealGpsPolling() {
 }
 
 function renderFleetLiveCards(shuttles) {
+  state.lastFleetShuttles = shuttles;
   const container = document.getElementById('containerFleetLiveCards');
   const countEl = document.getElementById('txtFleetLiveCount');
   if (!container || !Array.isArray(shuttles)) return;
 
-  if (countEl) countEl.innerText = `${shuttles.length} Araç`;
+  const isFilterRunningOnly = state.liveFleetFilter === 'running';
+  const displayedShuttles = isFilterRunningOnly 
+    ? shuttles.filter(s => s.current_status === 'running')
+    : shuttles;
 
-  container.innerHTML = shuttles.map(s => {
+  const runningCount = shuttles.filter(s => s.current_status === 'running').length;
+  if (countEl) {
+    countEl.innerText = `${runningCount} Canlı / ${shuttles.length} Araç`;
+  }
+
+  if (displayedShuttles.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 2rem 1.5rem; text-align: center; background: rgba(15,23,42,0.4); border: 1px dashed var(--border-color); border-radius: 12px; color: var(--text-muted);">
+        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">⏳</div>
+        <div style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 0.35rem;">Şu Anda Seferde Olan Canlı Araç Bulunmuyor</div>
+        <div style="font-size: 0.8rem; line-height: 1.5; max-width: 450px; margin: 0 auto;">
+          Şoför uygulamadan canlı konumu açtığında veya sefer saati geldiğinde araçlar burada anlık belirecektir.<br>
+          Bekleyen diğer araçları incelemek için yukarıdan <button type="button" class="btn-action secondary" onclick="setFleetLiveFilter('all')" style="padding: 2px 8px; font-size: 0.75rem; display: inline-flex; vertical-align: middle;">🌐 Tüm Araçlar</button> seçeneğine tıklayabilirsiniz.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = displayedShuttles.map(s => {
     const isLive = s.current_status === 'running';
     const isArrived = s.current_status === 'arrived' || s.current_status === 'completed';
     const borderStyle = isLive 
@@ -2013,3 +1947,326 @@ function showToast(title, message, type = 'info') {
     setTimeout(() => { toast.remove(); }, 300);
   }, 4000);
 }
+
+// =========================================================================
+// 10. SEFER GEÇMİŞİ VE GÜNLÜK RAPORLAMA (YILLIK ARŞİV)
+// =========================================================================
+state.tripFilterRange = 'today';
+state.tripFilterDate = new Date().toISOString().split('T')[0];
+
+window.setTripTimeRange = function(range) {
+  state.tripFilterRange = range;
+  ['btnTripRangeToday', 'btnTripRangeWeek', 'btnTripRangeMonth', 'btnTripRangeYear'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'btn-action secondary';
+  });
+  const activeBtn = document.getElementById(
+    range === 'today' ? 'btnTripRangeToday' :
+    (range === 'week' ? 'btnTripRangeWeek' :
+    (range === 'month' ? 'btnTripRangeMonth' : 'btnTripRangeYear'))
+  );
+  if (activeBtn) activeBtn.className = 'btn-action primary';
+
+  const dateInput = document.getElementById('filterTripDateInput');
+  if (range === 'today') {
+    state.tripFilterDate = new Date().toISOString().split('T')[0];
+    if (dateInput) dateInput.value = state.tripFilterDate;
+  } else {
+    state.tripFilterDate = '';
+    if (dateInput) dateInput.value = '';
+  }
+  loadCompanyTrips();
+};
+
+window.onTripDateChange = function(val) {
+  state.tripFilterDate = val;
+  state.tripFilterRange = 'custom';
+  ['btnTripRangeToday', 'btnTripRangeWeek', 'btnTripRangeMonth', 'btnTripRangeYear'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'btn-action secondary';
+  });
+  loadCompanyTrips();
+};
+
+window.loadCompanyTrips = async function() {
+  if (!state.activeCompanyId) return;
+  const compId = state.activeCompanyId;
+  const shuttleId = document.getElementById('filterTripShuttleSelect')?.value || 'all';
+  const tripType = document.getElementById('filterTripTypeSelect')?.value || 'all';
+
+  let url = `/api/company/${compId}/trips?shuttleId=${shuttleId}&tripType=${tripType}`;
+  if (state.tripFilterDate) {
+    url += `&date=${state.tripFilterDate}`;
+  } else if (state.tripFilterRange) {
+    url += `&range=${state.tripFilterRange}`;
+  }
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.success) return;
+
+    state.loadedTrips = data.trips || [];
+    renderTripStats(data.stats);
+    renderTripTable(data.trips);
+    populateTripShuttleFilter();
+    
+    // Durak ortalama giriş saatleri analizini de eşzamanlı yükle
+    loadStopAverages();
+  } catch (err) {
+    console.error('Sefer geçmişi yükleme hatası:', err);
+  }
+};
+
+// Firma Sahipleri & İK İçin: Günde Ortalama Hangi Durağa Kaçta Giriliyor Tablosu
+window.loadStopAverages = async function() {
+  if (!state.activeCompanyId) return;
+  const compId = state.activeCompanyId;
+  const shuttleId = document.getElementById('filterTripShuttleSelect')?.value || 'all';
+  const tripType = document.getElementById('filterTripTypeSelect')?.value || 'all';
+
+  const tbody = document.getElementById('companyStopAveragesTableBody');
+  if (!tbody) return;
+
+  try {
+    const res = await fetch(`/api/company/${compId}/stop-averages?shuttleId=${shuttleId}&tripType=${tripType}`);
+    const data = await res.json();
+    if (!data.success || !data.averages || data.averages.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 1.75rem; color: var(--text-muted);">
+            Henüz durak giriş logu bulunmuyor. Şoförler canlı GPS ile duraklardan geçtikçe ortalama saatler burada otomatik hesaplanır.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = data.averages.map((avg, idx) => {
+      const isEvening = avg.trip_type === 'evening';
+      const typeBadge = isEvening
+        ? '<span class="badge-tag" style="background: rgba(14,165,233,0.15); color: #38bdf8;">🌇 Akşam Dağıtım</span>'
+        : '<span class="badge-tag" style="background: rgba(245,158,11,0.15); color: #fbbf24;">🌅 Sabah Toplama</span>';
+
+      const delayMins = avg.avg_delay_minutes || 0;
+      let delayBadge = '';
+      if (delayMins > 2) {
+        delayBadge = `<span class="badge-tag" style="background: rgba(244,63,94,0.15); color: #fb7185; font-weight:700;">⚠️ +${delayMins} dk Gecikmeli</span>`;
+      } else if (delayMins < -2) {
+        delayBadge = `<span class="badge-tag" style="background: rgba(59,130,246,0.15); color: #60a5fa; font-weight:700;">⚡ ${Math.abs(delayMins)} dk Erken</span>`;
+      } else {
+        delayBadge = `<span class="badge-tag badge-success">✓ Tam Zamanında (±1 dk)</span>`;
+      }
+
+      return `
+        <tr>
+          <td>${typeBadge}</td>
+          <td><b>${avg.stop_order || (idx + 1)}. Durak</b></td>
+          <td><b style="color:#fff;">📍 ${avg.stop_name}</b></td>
+          <td><span style="font-family:'Fira Code', monospace; color:#94a3b8;">${avg.planned_eta || '-'}</span></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+              <span style="font-size:1.1rem;">⏱️</span>
+              <span style="font-family:'Fira Code', monospace; font-size:1rem; font-weight:800; color:#34d399;">${avg.avg_arrival_time}</span>
+            </div>
+          </td>
+          <td>${delayBadge}</td>
+          <td><span style="font-size:0.75rem; color:#cbd5e1;">${avg.sample_count} Sefer Verisi</span></td>
+          <td><span style="font-size:0.75rem; color:#94a3b8;">${avg.last_date_formatted || '-'}</span></td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Durak analiz yükleme hatası:', err);
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#f43f5e;">Veri yüklenemedi.</td></tr>`;
+  }
+};
+
+// Seferin her durağa kaçta girdiğini gösteren modalı aç
+window.showTripStopLogsModal = function(tripId) {
+  const trip = (state.loadedTrips || []).find(t => t.id === tripId);
+  if (!trip) return;
+
+  const modal = document.getElementById('modalTripStopDetails');
+  const metaEl = document.getElementById('txtModalTripMeta');
+  const tbody = document.getElementById('tbodyTripStopLogs');
+
+  const isEvening = trip.trip_type === 'evening';
+  const tripTypeLabel = isEvening ? '🌇 Akşam Dağıtım Seferi' : '🌅 Sabah Toplama Seferi';
+
+  metaEl.innerHTML = `
+    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+      <div><b>🚐 Plaka:</b> ${trip.plate} &nbsp;|&nbsp; <b>Şoför:</b> ${trip.driver_name || '-'} &nbsp;|&nbsp; <b>Tür:</b> ${tripTypeLabel}</div>
+      <div><b>📅 Tarih:</b> ${trip.date_formatted || trip.trip_date} &nbsp;|&nbsp; <b>Kalkış:</b> ${trip.start_time_formatted} ➔ <b>Varış:</b> ${trip.end_time_formatted || 'Sürüyor'}</div>
+    </div>
+  `;
+
+  const logs = trip.stop_logs || [];
+  if (logs.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          Bu sefer için henüz durak geçiş kaydı oluşmamış veya eski tarihli sefer.
+        </td>
+      </tr>
+    `;
+  } else {
+    tbody.innerHTML = logs.map(l => {
+      const delay = l.delay_minutes || 0;
+      let delayBadge = '';
+      if (delay > 2) {
+        delayBadge = `<span class="badge-tag" style="background: rgba(244,63,94,0.15); color: #fb7185;">+${delay} dk gecikmeli</span>`;
+      } else if (delay < -2) {
+        delayBadge = `<span class="badge-tag" style="background: rgba(59,130,246,0.15); color: #60a5fa;">${Math.abs(delay)} dk erken</span>`;
+      } else {
+        delayBadge = `<span class="badge-tag badge-success">✓ Zamanında</span>`;
+      }
+
+      return `
+        <tr>
+          <td><b>${l.stop_order}. Durak</b></td>
+          <td><b style="color:#fff;">${l.stop_name}</b></td>
+          <td><span style="font-family:'Fira Code', monospace; color:#94a3b8;">${l.planned_eta || '-'}</span></td>
+          <td><span style="font-family:'Fira Code', monospace; color:#34d399; font-weight:700;">${l.reached_time_formatted || '-'}</span></td>
+          <td>${delayBadge}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  modal.classList.add('active');
+};
+
+function renderTripStats(stats) {
+  const totalEl = document.getElementById('statTotalTrips');
+  const compSubEl = document.getElementById('statCompletedSubText');
+  const avgEl = document.getElementById('statAvgDuration');
+  const passEl = document.getElementById('statTotalPassengers');
+  const todayEl = document.getElementById('statTodayTrips');
+  const activeSubEl = document.getElementById('statActiveTripsSubText');
+  const badgeEl = document.getElementById('badgeTripTodayCount');
+
+  if (totalEl) totalEl.innerText = stats.total_count || 0;
+  if (compSubEl) compSubEl.innerText = `${stats.completed_count || 0} Tamamlandı`;
+  if (avgEl) {
+    const mins = stats.avg_duration_mins || 0;
+    if (mins >= 60) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      avgEl.innerText = `${h} sa ${m > 0 ? m + ' dk' : ''}`;
+    } else {
+      avgEl.innerText = `${mins} dk`;
+    }
+  }
+  if (passEl) passEl.innerText = stats.total_passengers || 0;
+  if (todayEl) todayEl.innerText = stats.completed_count || 0;
+  if (activeSubEl) activeSubEl.innerText = `${stats.active_count || 0} Aktif Sefer`;
+  if (badgeEl) badgeEl.innerText = stats.completed_count || 0;
+}
+
+function renderTripTable(trips) {
+  const tbody = document.getElementById('companyTripsTableBody');
+  if (!tbody) return;
+
+  if (!trips || trips.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">📋</div>
+          <b>Seçilen filtre kriterlerine uygun sefer kaydı bulunamadı.</b>
+          <div style="font-size: 0.8rem; margin-top: 0.25rem;">Şoförler seferi tamamladıkça kalkış, varış ve süre bilgileri anında burada arşivlenir.</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = trips.map(t => {
+    const isEvening = t.trip_type === 'evening';
+    const isCompleted = t.status === 'completed';
+    const statusBadge = isCompleted 
+      ? '<span class="badge-tag badge-success">✅ Tamamlandı</span>'
+      : '<span class="badge-tag" style="background: rgba(16,185,129,0.2); color:#34d399; font-weight:700;">🟢 Sefer Sürüyor</span>';
+    
+    const typeBadge = isEvening
+      ? '<span class="badge-tag" style="background: rgba(14,165,233,0.15); color: #38bdf8; border: 1px solid rgba(14,165,233,0.3);">🌇 Akşam Dağıtım</span>'
+      : '<span class="badge-tag" style="background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">🌅 Sabah Toplama</span>';
+
+    const durMins = t.duration_minutes || 0;
+    let durText = '--';
+    if (isCompleted) {
+      if (durMins >= 60) {
+        const h = Math.floor(durMins / 60);
+        const m = durMins % 60;
+        durText = `<b>${h} sa ${m > 0 ? m + ' dk' : ''}</b>`;
+      } else {
+        durText = `<b>${durMins} dk</b>`;
+      }
+    } else {
+      durText = '<span style="color:#34d399; font-size:0.75rem;">⏱️ Devam ediyor...</span>';
+    }
+
+    const logCount = (t.stop_logs || []).length;
+    const logBtn = `
+      <button type="button" class="btn-action secondary" onclick="showTripStopLogsModal(${t.id})" style="padding: 0.25rem 0.6rem; font-size: 0.725rem; white-space:nowrap;">
+        ⏱️ Durak Logları (${logCount})
+      </button>
+    `;
+
+    return `
+      <tr>
+        <td><b>${t.date_formatted || t.trip_date}</b></td>
+        <td>
+          <div style="font-family:'Fira Code', monospace; font-weight:800; color:#fff;">${t.plate}</div>
+        </td>
+        <td>${t.driver_name || '-'}</td>
+        <td>${typeBadge}</td>
+        <td><span style="font-size:0.8rem; color:#93c5fd;">${t.route_name || 'Servis Güzergahı'}</span></td>
+        <td><span style="font-family:'Fira Code', monospace; color:#34d399;">${t.start_time_formatted || '-'}</span></td>
+        <td><span style="font-family:'Fira Code', monospace; color:#60a5fa;">${t.end_time_formatted || '--:--:--'}</span></td>
+        <td>${durText}</td>
+        <td><span class="badge-tag badge-portal">${t.stops_visited || 0} / ${t.total_stops || 0} Durak</span></td>
+        <td>${logBtn}</td>
+        <td>${statusBadge}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function populateTripShuttleFilter() {
+  const sel = document.getElementById('filterTripShuttleSelect');
+  if (!sel || !state.activeCompanyData || sel.options.length > 1) return;
+  const shuttles = state.activeCompanyData.shuttles || [];
+  shuttles.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.innerText = `🚐 ${s.plate} (${s.driver_name || 'Şoför'})`;
+    sel.appendChild(opt);
+  });
+}
+
+window.exportTripsCsv = function() {
+  const table = document.querySelector('#viewCompanyTrips table');
+  if (!table) return;
+  let csv = [];
+  const rows = table.querySelectorAll('tr');
+  rows.forEach(r => {
+    const cols = r.querySelectorAll('th, td');
+    let rowData = [];
+    cols.forEach(c => {
+      let text = c.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
+      rowData.push(`"${text}"`);
+    });
+    if (rowData.length > 0) csv.push(rowData.join(','));
+  });
+
+  const blob = new Blob(["\uFEFF" + csv.join("\n")], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Servis_Sefer_Raporu_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast("Rapor İndirildi", "Sefer kayıtları CSV / Excel formatında dışa aktarıldı.", "success");
+};

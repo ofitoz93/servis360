@@ -786,13 +786,19 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="button" class="btn-board waiting" onclick="testMobileNotification()" style="flex: 1; padding: 0.6rem; font-size: 0.8rem; background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); color: #93c5fd; font-weight: 700;">
-            📲 Telefonuma Bildirim Gönder (Test Et)
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn-board waiting" onclick="testMobileNotification()" style="flex: 1; min-width: 140px; padding: 0.6rem; font-size: 0.8rem; background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); color: #93c5fd; font-weight: 700;">
+            📲 Anlık Bildirim Testi
+          </button>
+          <button type="button" class="btn-board waiting" onclick="testLockedScreenPush()" style="flex: 1; min-width: 180px; padding: 0.6rem; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5); color: #6ee7b7; font-weight: 700;">
+            🔒 5 sn Sonra Kilitli Ekran Testi
           </button>
           <button type="button" class="btn-board waiting" onclick="reinstallPwaNotice()" style="padding: 0.6rem 0.8rem; font-size: 0.8rem; color: #cbd5e1;">
-            ℹ️ Kurulum İpuçları
+            ℹ️ İpuçları
           </button>
+        </div>
+        <div id="pushSubscriptionStatus" style="font-size: 0.725rem; margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.1); color: #94a3b8;">
+          🌐 Web Push (Kilitli Ekran): Kontrol ediliyor...
         </div>
       </div>
 
@@ -916,6 +922,28 @@
         <button type="button" class="btn-action-gps start" id="btnInstallPwa" onclick="handlePwaInstallClick()" style="padding: 0.75rem 1rem; font-size: 0.9rem; justify-content: center;">
           <span>📲 Ana Ekrana Ekle / İndir</span>
         </button>
+      </div>
+
+      <!-- Web Push & Kilitli Ekran Bildirim Test Kartı -->
+      <div class="card" style="border: 1px solid rgba(59,130,246,0.35); background: rgba(15,23,42,0.95); margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
+          <div style="font-size: 0.9rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
+            <span>🔔</span>
+            <span>Kilitli Ekran & Arka Plan Bildirimi</span>
+          </div>
+          <span class="status-pill" id="badgePushStatus" style="font-size: 0.7rem; color: #34d399;">Web Push Aktif</span>
+        </div>
+        <p style="font-size: 0.75rem; color: #cbd5e1; line-height: 1.45; margin-bottom: 0.75rem;">
+          Şoför uygulamadan çıksa veya telefonun ekranı kilitli olsa dahi sefer saati (07:15) geldiğinde telefonun titreyip çalması için sunucu tabanlı Web Push sistemi devrededir.
+        </p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn-action-gps start" onclick="testLockedScreenPushNotification()" style="flex: 1; min-width: 180px; padding: 0.65rem 0.75rem; font-size: 0.8rem; justify-content: center; background: linear-gradient(135deg, #3b82f6, #1d4ed8); box-shadow: 0 4px 15px rgba(59,130,246,0.35);">
+            <span>🔒 5 sn Sonra Kilitli Ekran Testi</span>
+          </button>
+          <button type="button" class="btn-board waiting" onclick="subscribeToWebPush(true)" style="padding: 0.65rem 0.85rem; font-size: 0.75rem;" title="Push Aboneliğini Tazele">
+            <span>🔄 İzni Yenile</span>
+          </button>
+        </div>
       </div>
 
     </div>
@@ -1248,6 +1276,132 @@
       );
     }
 
+    // Web Push Helper: Base64 VAPID anahtarını Uint8Array'e dönüştürür
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    // Telefon Kilitliyken Sunucudan Web Push Bildirimi Alma Kaydı (PushManager)
+    async function subscribeToWebPush() {
+      const statusEl = document.getElementById('pushSubscriptionStatus');
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ Web Push: Tarayıcınızda Push desteği bulunamadı veya güvenli HTTPS bağlantısı yok.</span>';
+        return;
+      }
+      try {
+        const reg = swRegistration || (await navigator.serviceWorker.ready);
+        if (!reg) return;
+
+        // VAPID Public Key al
+        const keyRes = await fetch('/api/push/vapid-public-key');
+        const keyData = await keyRes.json();
+        if (!keyData.publicKey) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ VAPID anahtarı alınamadı.</span>';
+          return;
+        }
+
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          if (Notification.permission === 'granted') {
+            sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+            });
+          }
+        }
+
+        if (sub && activeShuttle && activeShuttle.id) {
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shuttleId: activeShuttle.id,
+              subscription: sub.toJSON()
+            })
+          });
+          if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#34d399">🟢 <b>Kilitli Ekran Web Push Hazır:</b> Telefon ekranı kapalı olsa bile 07:15 sefer saati geldiğinde sunucu doğrudan telefonunuzu çaldırır.</span>';
+          }
+        } else if (Notification.permission !== 'granted') {
+          if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#fbbf24">🟡 Kilitli Ekran Bildirimi için tarayıcı bildirim izni vermeniz gereklidir.</span>';
+          }
+        }
+      } catch (err) {
+        console.warn('Web push subscribe error:', err);
+        if (statusEl) {
+          statusEl.innerHTML = `<span style="color:#f59e0b">⚠️ Web Push: ${err.message}</span>`;
+        }
+      }
+    }
+
+    // Telefonu Kilitleyip Test Etmek İçin 5sn Gecikmeli Web Push Testi
+    async function testLockedScreenPush() {
+      if (!activeShuttle) {
+        alert('Lütfen önce şoför girişi yapın.');
+        return;
+      }
+
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        updateNotificationUiStatus();
+        if (perm !== 'granted') {
+          alert('Bildirim izni vermeden kilitli ekrana bildirim gönderilemez. Lütfen tarayıcı ayarlarından bildirim iznini açın.');
+          return;
+        }
+      }
+
+      const statusEl = document.getElementById('pushSubscriptionStatus');
+      if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8">⏳ Kilitli ekran aboneliği yenileniyor ve test bildirimi kuruluyor...</span>';
+
+      try {
+        const reg = swRegistration || (await navigator.serviceWorker.ready);
+        const keyRes = await fetch('/api/push/vapid-public-key');
+        const keyData = await keyRes.json();
+        
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+          });
+        }
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shuttleId: activeShuttle.id,
+            subscription: sub.toJSON()
+          })
+        });
+
+        const res = await fetch('/api/push/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shuttleId: activeShuttle.id, delaySeconds: 5 })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Test başarısız');
+
+        if (statusEl) {
+          statusEl.innerHTML = '<span style="color:#34d399">⏱️ 5 SANİYE SAYACI BAŞLADI: Telefonu hemen kilitleyin!</span>';
+        }
+
+        alert('🔒 TEST BAŞLATILDI!\n\n1. Şimdi hemen telefonunuzun GÜÇ / KİLİT TUŞUNA BASARAK EKRANI KAPATIN.\n2. 5 saniye sonra sunucudan telefonunuza yüksek öncelikli Web Push bildirimi gelecek ve telefon titreyecek.\n3. Gelen bildirime dokunduğunuzda canlı sefer kokpiti otomatik açılacaktır.');
+      } catch (err) {
+        alert('Push Test Hatası: ' + err.message);
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">❌ Test Hatası: ${err.message}</span>`;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       // Service Worker Kaydı (Mobil Bildirimler ve PWA Eylemleri)
       if ('serviceWorker' in navigator) {
@@ -1256,6 +1410,7 @@
             swRegistration = reg;
             console.log('✅ ServiceWorker hazır, scope:', reg.scope);
             updateNotificationUiStatus();
+            subscribeToWebPush();
           })
           .catch((err) => {
             console.warn('ServiceWorker kayıt hatası:', err);
@@ -1267,6 +1422,11 @@
             console.log('🛑 Bildirim üzerinden canlı konum durdurma emri alındı.');
             if (isTracking) {
               stopTracking();
+            }
+          } else if (event.data && event.data.type === 'NOTIFICATION_CLICKED_AUTO_START') {
+            console.log('🚀 Bildirim tıklandı, canlı sefer başlatılıyor.');
+            if (!isTracking) {
+              triggerAutoStartTrip(currentTripType || 'morning');
             }
           }
         });
@@ -1382,10 +1542,22 @@
       startAutoShiftClockCheck();
       updateNotificationUiStatus();
 
+      // Kilitli ekran Web Push bildirim kaydını sunucuyla eşle
+      subscribeToWebPush();
+
       // CANLI KONUM KONTROLÜ: Eğer araç veritabanında "running" (yayında) durumundaysa, kokpitte takibi derhal başlat ve canlı bannerı aç!
       if (activeShuttle && activeShuttle.current_status === 'running' && !isTracking) {
         console.log('🟢 Servis veritabanında aktif (running) kayıtlı, kokpitte canlı GPS akışı sürdürülüyor...');
         startTracking(false, true); // isAutoResume = true
+      }
+
+      // Bildirimden veya URL parametresinden ?autostart=1 geldiyse seferi otomatik başlat!
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('autostart') === '1' && !isTracking) {
+        console.log('🚀 URL üzerinden autostart=1 algılandı, canlı sefer başlatılıyor...');
+        setTimeout(() => {
+          triggerAutoStartTrip(currentTripType || 'morning');
+        }, 600);
       }
     }
 
@@ -1723,7 +1895,38 @@
       } catch (e) {}
     }
 
-    // Vardiya Saati Otomatik Kontrolü (07:15 ve 16:45 / Dönüş saati olduğunda anlık başlatma)
+    // Ekran Kapanmasını Önleyici Wake Lock API
+    let screenWakeLock = null;
+    async function acquireWakeLock() {
+      try {
+        if ('wakeLock' in navigator && !screenWakeLock) {
+          screenWakeLock = await navigator.wakeLock.request('screen');
+          console.log('💡 Screen Wake Lock aktif: Telefon ekranının kapanması engellendi.');
+          screenWakeLock.addEventListener('release', () => {
+            console.log('Screen Wake Lock serbest bırakıldı.');
+            screenWakeLock = null;
+          });
+        }
+      } catch (e) {
+        console.warn('Wake Lock hatası:', e.message);
+      }
+    }
+
+    function releaseWakeLock() {
+      if (screenWakeLock) {
+        screenWakeLock.release().catch(() => {});
+        screenWakeLock = null;
+      }
+    }
+
+    function timeStrToMinutes(timeStr) {
+      if (!timeStr || !timeStr.includes(':')) return null;
+      const parts = timeStr.trim().split(':').map(Number);
+      if (isNaN(parts[0]) || isNaN(parts[1])) return null;
+      return parts[0] * 60 + parts[1];
+    }
+
+    // Vardiya Saati Akıllı Kontrolü (Geniş zaman penceresi ve ekran uyanma algılayıcısı)
     function startAutoShiftClockCheck() {
       if (autoClockInterval) clearInterval(autoClockInterval);
       
@@ -1734,7 +1937,7 @@
       const executeShiftCheck = async () => {
         if (!activeShuttle) return;
 
-        // Her kontrol öncesi saatleri güncel tut
+        // Her kontrol öncesi saatleri sunucuyla senkronize tut
         await syncShuttleDetailsFromServer();
 
         // Eğer araç zaten canlı yayındaysa tekrar başlatma
@@ -1747,15 +1950,30 @@
         }
 
         const now = new Date();
-        const currentHours = now.getHours().toString().padStart(2, '0');
-        const currentMins = now.getMinutes().toString().padStart(2, '0');
-        const currentTimeStr = `${currentHours}:${currentMins}`;
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+
+        const morningStartMins = timeStrToMinutes(activeShuttle.shift_start_time || '07:15');
+        const returnMins = timeStrToMinutes(activeShuttle.return_time || '17:30');
+
+        // Bugün bu sefer modu daha önce tamamlandı mı kontrolü (günde 1 kere otomatik tetikleme)
+        const todayDateKey = now.toISOString().slice(0, 10);
+        const morningCompleted = sessionStorage.getItem(`servis360_completed_morning_${todayDateKey}`);
+        const eveningCompleted = sessionStorage.getItem(`servis360_completed_evening_${todayDateKey}`);
 
         let targetMode = null;
-        if (currentTimeStr === activeShuttle.return_time) {
-          targetMode = 'evening';
-        } else if (currentTimeStr === activeShuttle.shift_start_time) {
-          targetMode = 'morning';
+
+        // 1. AKŞAM SEFERİ PENCERESİ: (Dönüş saatine 10 dk kala başlar, 120 dk sonrasına kadar sürer)
+        if (returnMins && nowMins >= (returnMins - 10) && nowMins <= (returnMins + 120)) {
+          if (!eveningCompleted && activeShuttle.current_status !== 'completed_evening') {
+            targetMode = 'evening';
+          }
+        } 
+        // 2. SABAH TOPLAMA PENCERESİ: (Başlama saatine 5 dk kala başlar, 120 dk sonrasına kadar sürer)
+        // (Örn: 07:10 - 09:15 arası; kullanıcı telefonu 07:20'de açsa bile otomatik başlatır!)
+        else if (morningStartMins && nowMins >= (morningStartMins - 5) && nowMins <= (morningStartMins + 120)) {
+          if (!morningCompleted && activeShuttle.current_status !== 'completed') {
+            targetMode = 'morning';
+          }
         }
 
         if (targetMode) {
@@ -1764,10 +1982,10 @@
             (pos) => {
               // GPS açık, doğrudan yayını başlat
               document.getElementById('modalGpsOffAlarm').style.display = 'none';
-              triggerSimulatedAutoStart(targetMode);
+              triggerAutoStartTrip(targetMode);
             },
             (err) => {
-              // GPS kapalı veya erişilemiyor, alarm çal ve bildirim ver!
+              // GPS kapalı veya erişilemiyor, sesli alarm çal ve ekranda açma butonunu göster
               showGpsOffAlarmModal(targetMode);
             },
             { enableHighAccuracy: true, timeout: 5000 }
@@ -1775,14 +1993,23 @@
         }
       };
 
-      // 1. Kokpit açıldığında HİÇ BEKLEMEDEN 1. kontrolü hemen yap!
+      // 1. Sayfa açıldığında derhal kontrol et
       executeShiftCheck();
 
-      // 2. Ardından her 10 saniyede bir kontrol et (gecikme olmasın)
+      // 2. Her 10 saniyede bir periyodik kontrol et
       autoClockInterval = setInterval(executeShiftCheck, 10000);
+
+      // 3. Telefon ekranı kilit açıldığında veya sekme öne geldiğinde UYKU MODUNDAN UYAN VE HEMEN KONTROL ET!
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          console.log('📱 Ekran açıldı / sekme ön plana geldi. Sefer saati tetikleniyor...');
+          executeShiftCheck();
+        }
+      });
+      window.addEventListener('focus', executeShiftCheck);
     }
 
-    // Sefer Otomatik / Manuel Alarm ile Başlatma
+    // Sefer Otomatik / Alarm ile Başlatma
     function triggerAutoStartTrip(mode = 'morning') {
       if (isTracking) stopTracking();
 
@@ -1790,12 +2017,12 @@
       playSuccessChime();
       if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
-      const timeStr = mode === 'evening' ? (activeShuttle.return_time || '16:45') : (activeShuttle.shift_start_time || '07:15');
+      const timeStr = mode === 'evening' ? (activeShuttle.return_time || '17:30') : (activeShuttle.shift_start_time || '07:15');
       const modeLabel = mode === 'evening' ? '🌇 AKŞAM DÖNÜŞ (DAĞITIM)' : '🌅 SABAH TOPLAMA';
 
       sendMobileNotification(
         `🔔 ${modeLabel} Saati Geldi!`,
-        `${activeShuttle.plate} için sefer saati (${timeStr}). Canlı GPS yayını başlatıldı.`,
+        `${activeShuttle.plate} için sefer saati (${timeStr}). Canlı GPS yayını otomatik başlatıldı.`,
         [
           { action: 'continue', title: '▶️ Devam Et' },
           { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
@@ -1805,12 +2032,14 @@
       );
 
       startTracking();
+      acquireWakeLock();
     }
     const triggerSimulatedAutoStart = triggerAutoStartTrip;
 
     let driverRoutePolyline = null;
     let driverStopMarkers = [];
 
+    // Rota Çizimi: Sabah Fabrikaya Doğru, Akşam Fabrikadan Evlere Doğru Çift Yönlü
     function drawRouteOnDriverMap() {
       if (!driverMap) return;
 
@@ -1821,18 +2050,24 @@
       driverStopMarkers.forEach(m => driverMap.removeLayer(m));
       driverStopMarkers = [];
 
+      const isEvening = currentTripType === 'evening';
+
       // Durakları ekle
       if (activeRouteStops && activeRouteStops.length > 0) {
-        activeRouteStops.forEach(st => {
+        activeRouteStops.forEach((st, idx) => {
           if (!st.lat || !st.lng) return;
+          const orderNum = isEvening ? `${activeRouteStops.length - idx}` : `${st.stop_order || (idx + 1)}`;
+          const pinColor = isEvening ? '#f59e0b' : '#3b82f6';
+          const pinBorder = isEvening ? '#fbbf24' : '#60a5fa';
+
           const sIcon = L.divIcon({
             className: 'custom-pin',
-            html: `<div style="background:#0f172a; border:2px solid #3b82f6; color:#93c5fd; width:22px; height:22px; border-radius:50%; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.6);">${st.stop_order || '•'}</div>`,
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
+            html: `<div style="background:#0f172a; border:2px solid ${pinBorder}; color:${pinColor}; width:24px; height:24px; border-radius:50%; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.6);">${orderNum}</div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
           });
           const m = L.marker([st.lat, st.lng], { icon: sIcon })
-            .bindPopup(`<b>${st.stop_name || 'Durak'}</b><br>Saat: ${st.eta_time || '-'}`)
+            .bindPopup(`<b>${st.stop_name || 'Durak'}</b><br>Sıra: ${orderNum}<br>Planlanan Saat: ${st.eta_time || '-'}`)
             .addTo(driverMap);
           driverStopMarkers.push(m);
         });
@@ -1840,15 +2075,20 @@
 
       // Rota çizgisi (OSRM Yol Geometrisi)
       if (activeRoute && activeRoute.road_geometry && Array.isArray(activeRoute.road_geometry) && activeRoute.road_geometry.length > 1) {
-        const pts = currentTripType === 'evening' 
+        // Sabah: Duraklar -> Fabrika
+        // Akşam: Fabrika -> Duraklar (Ters Geometri)
+        const pts = isEvening 
           ? [...activeRoute.road_geometry].reverse() 
           : [...activeRoute.road_geometry];
 
         driverRoutePolyline = L.polyline(pts, {
-          color: currentTripType === 'evening' ? '#0ea5e9' : '#3b82f6',
-          weight: 4,
-          opacity: 0.85
+          color: isEvening ? '#f59e0b' : '#3b82f6',
+          weight: 5,
+          opacity: 0.9,
+          dashArray: isEvening ? '12, 6' : null
         }).addTo(driverMap);
+
+        driverMap.fitBounds(driverRoutePolyline.getBounds(), { padding: [25, 25] });
       }
     }
 
@@ -2152,6 +2392,19 @@
 
           // Bu duraktaki yolcuların durumunu otomatik güncelle
           autoUpdatePassengersForStop(stop);
+
+          // Sefer günlüğü için sunucuya durak logu ilet
+          fetch(`/api/shuttle/${activeShuttle.id}/stop-passed`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              stop_id: stop.id,
+              stop_order: stop.stop_order,
+              stop_name: stop.stop_name,
+              planned_eta: stop.eta_time,
+              trip_type: currentTripType
+            })
+          }).catch(() => {});
           break;
         }
       }
@@ -2247,7 +2500,6 @@
     }
 
     async function handleGpsSuccess(pos) {
-      // Gerçek telefon GPS koordinatı geldiği an simülasyonu sonlandır!
       if (simInterval) {
         clearInterval(simInterval);
         simInterval = null;
@@ -2259,43 +2511,16 @@
       await sendGpsLocation(lat, lng, speedKmH, pos.coords.heading || 0, accuracy);
     }
 
-    // Otomatik Yol Simülasyonu (Gerçek sahada kesinlikle devre dışıdır - sadece ?force_demo=1 ile açılabilir)
-    function startSimulatedGpsStream() {
-      if (simInterval) clearInterval(simInterval);
-      if (!window.location.search.includes('force_demo=1')) {
-        console.log('[GPS] Gerçek cihaz GPS modu aktif. Otomatik demo sürüşü devre dışı.');
-        return;
-      }
-
-      // Sadece geliştirici açıkça ?force_demo=1 derse çalışır
-      let routePoints = [];
-      if (activeRoute && activeRoute.road_geometry && Array.isArray(activeRoute.road_geometry) && activeRoute.road_geometry.length > 0) {
-        routePoints = currentTripType === 'evening'
-          ? [...activeRoute.road_geometry].reverse()
-          : [...activeRoute.road_geometry];
-      }
-
-      let stepIndex = 0;
-      simInterval = setInterval(async () => {
-        if (!isTracking || stepIndex >= routePoints.length) {
-          clearInterval(simInterval);
-          simInterval = null;
-          return;
-        }
-
-        const pt = routePoints[stepIndex];
-        stepIndex++;
-        await sendGpsLocation(pt[0], pt[1], 45, 90, 6);
-      }, 2500);
-    }
-
     function triggerArrivalAutomation(data) {
       stopTracking();
+      releaseWakeLock();
       playArrivalFanfare();
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
 
       const isEvening = data.trip_type === 'evening' || currentTripType === 'evening';
       const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
+      const todayDateKey = new Date().toISOString().slice(0, 10);
+      sessionStorage.setItem(`servis360_completed_${isEvening ? 'evening' : 'morning'}_${todayDateKey}`, '1');
 
       if (isEvening) {
         // Akşam dönüşünde sabahki 1. durağa varıldı!

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
+const webpush = require('web-push');
 
 const app = express();
 const PORT = process.env.PORT || 4173;
@@ -14,6 +15,16 @@ const pool = new Pool({
     rejectUnauthorized: false
   }
 });
+
+// VAPID Web Push Yapılandırması (Telefon ekranı kapalıyken bildirim gönderme için)
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BOHN6hRnH0S13TSYP2mmLTUIYFrLds9rvgsOwdmzMKAWSR_3v-O4o6PWcyas2Z05oIf8gGaySfLl87vXp8Lh-_c';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'sbDQJwNiqfvGcM7Kx_kOhdqOuzZ42EA-y6xVa8SNw3o';
+
+webpush.setVapidDetails(
+  'mailto:destek@servis360.com',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -523,6 +534,44 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
     let workplace = compRes.rows.length > 0 ? compRes.rows[0] : null;
     let reachedStopName = null;
 
+    // Sefer Kaydı (service_trips) - Aktif sefer var mı kontrol et veya otomatik başlat
+    let trip = null;
+    const activeTripRes = await pool.query(`
+      SELECT * FROM service_trips 
+      WHERE shuttle_id = $1 AND status = 'in_progress' 
+      ORDER BY start_time DESC LIMIT 1
+    `, [shuttleId]);
+
+    if (activeTripRes.rows.length === 0) {
+      const rRes = await pool.query('SELECT * FROM routes WHERE shuttle_id = $1 LIMIT 1', [shuttleId]);
+      const matchedRoute = rRes.rows[0];
+      const stopCountRes = matchedRoute 
+        ? await pool.query('SELECT COUNT(*) as c FROM stops WHERE route_id = $1', [matchedRoute.id])
+        : { rows: [{ c: 0 }] };
+      const passCountRes = await pool.query('SELECT COUNT(*) as c FROM employees WHERE shuttle_id = $1', [shuttleId]);
+
+      const insertTrip = await pool.query(`
+        INSERT INTO service_trips (
+          company_id, shuttle_id, route_id, plate, driver_name, route_name,
+          trip_type, trip_date, start_time, start_lat, start_lng, total_stops,
+          passenger_count, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, NOW(), $8, $9, $10, $11, 'in_progress')
+        RETURNING *
+      `, [
+        shuttle.company_id, shuttle.id, matchedRoute ? matchedRoute.id : null,
+        shuttle.plate, shuttle.driver_name, matchedRoute ? matchedRoute.route_name : 'Servis Güzergahı',
+        trip_type || 'morning', lat, lng,
+        parseInt(stopCountRes.rows[0].c) || 0,
+        parseInt(passCountRes.rows[0].c) || 0
+      ]);
+      trip = insertTrip.rows[0];
+    } else {
+      trip = activeTripRes.rows[0];
+    }
+
+    // Seferin kaç saniyedir sürdüğü (erken varış tetiklenmesini önlemek için)
+    const tripSeconds = trip ? (Date.now() - new Date(trip.start_time).getTime()) / 1000 : 999;
+
     // 1. AKŞAM DÖNÜŞ SEFERİ: Hedef sabahki 1. durak (rotanın ilk durağı / son bırakma durağı)
     if (trip_type === 'evening') {
       const firstStopRes = await pool.query(`
@@ -540,7 +589,6 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
         const targetLng = firstStop.lng;
         const radiusMeters = 250; // 250 metre varış çiti
 
-        // Haversine hesaplama
         const R = 6371e3;
         const phi1 = lat * Math.PI / 180;
         const phi2 = targetLat * Math.PI / 180;
@@ -552,10 +600,31 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         const distance = R * c;
 
-        if (distance <= radiusMeters) {
+        // Sefer en az 20 saniye önce başlamış olmalı ve hedef çite girmeli
+        if (distance <= radiusMeters && tripSeconds > 20) {
           arrived = true;
           reachedStopName = firstStop.stop_name || 'Sabahki 1. Durak';
           await pool.query("UPDATE shuttles SET current_status = 'completed' WHERE id = $1", [shuttleId]);
+
+          if (trip) {
+            await pool.query(`
+              UPDATE service_trips 
+              SET end_time = NOW(),
+                  duration_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (NOW() - start_time)) / 60)),
+                  end_lat = $1, end_lng = $2,
+                  status = 'completed',
+                  end_reason = 'arrived_geofence'
+            WHERE id = $3
+            `, [lat, lng, trip.id]);
+
+            // Durak loglarına akşam son bırakma durağını kaydet
+            await pool.query(`
+              INSERT INTO trip_stop_logs (
+                trip_id, shuttle_id, company_id, stop_order, stop_name,
+                trip_type, planned_eta, reached_at, delay_minutes
+              ) VALUES ($1, $2, $3, $4, $5, 'evening', $6, NOW(), 0)
+            `, [trip.id, shuttleId, shuttle.company_id, 99, reachedStopName, firstStop.eta_time || 'Varış']);
+          }
         }
       }
     } 
@@ -563,9 +632,8 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
     else if (workplace) {
       const targetLat = workplace.workplace_lat;
       const targetLng = workplace.workplace_lng;
-      const radiusMeters = workplace.geofence_radius_meters || 180;
+      const radiusMeters = Math.max(workplace.geofence_radius_meters || 250, 250);
 
-      // Haversine mesafe hesabı
       const R = 6371e3;
       const phi1 = lat * Math.PI / 180;
       const phi2 = targetLat * Math.PI / 180;
@@ -577,10 +645,31 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       const distance = R * c;
 
-      if (distance <= radiusMeters) {
+      // Sefer en az 20 saniye önce başlamış olmalı ve varış çitine girmeli
+      if (distance <= radiusMeters && tripSeconds > 20) {
         arrived = true;
         reachedStopName = workplace.workplace_name;
         await pool.query("UPDATE shuttles SET current_status = 'arrived' WHERE id = $1", [shuttleId]);
+
+        if (trip) {
+          await pool.query(`
+            UPDATE service_trips 
+            SET end_time = NOW(),
+                duration_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (NOW() - start_time)) / 60)),
+                end_lat = $1, end_lng = $2,
+                status = 'completed',
+                end_reason = 'arrived_geofence'
+            WHERE id = $3
+          `, [lat, lng, trip.id]);
+
+          // Durak loglarına sabah fabrika varışını kaydet
+          await pool.query(`
+            INSERT INTO trip_stop_logs (
+              trip_id, shuttle_id, company_id, stop_order, stop_name,
+              trip_type, planned_eta, reached_at, delay_minutes
+            ) VALUES ($1, $2, $3, $4, $5, 'morning', $6, NOW(), 0)
+          `, [trip.id, shuttleId, shuttle.company_id, 99, reachedStopName, 'Varış']);
+        }
       }
     }
 
@@ -610,9 +699,19 @@ app.post('/api/shuttle/:shuttleId/finish-trip', async (req, res) => {
       RETURNING *
     `, [shuttleId]);
 
+    // Aktif sefer kaydını kapat ve süreyi kaydet
+    await pool.query(`
+      UPDATE service_trips 
+      SET end_time = NOW(),
+          duration_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (NOW() - start_time)) / 60)),
+          status = 'completed',
+          end_reason = 'driver_manual_end'
+      WHERE shuttle_id = $1 AND status = 'in_progress'
+    `, [shuttleId]);
+
     res.json({
       success: true,
-      message: 'Sefer başarıyla tamamlandı ve kapatıldı.',
+      message: 'Sefer başarıyla tamamlandı ve sefer günlüğüne kaydedildi.',
       trip_type: trip_type || 'morning',
       shuttle: updateRes.rows[0]
     });
@@ -622,7 +721,7 @@ app.post('/api/shuttle/:shuttleId/finish-trip', async (req, res) => {
   }
 });
 
-// Şoförün canlı konumu başlatması veya durdurması durumunda statü güncelleme
+// Şoförün canlı konumu durdurması durumunda statü güncelleme
 app.post('/api/shuttle/:shuttleId/status', async (req, res) => {
   const { shuttleId } = req.params;
   const { status } = req.body;
@@ -634,6 +733,18 @@ app.post('/api/shuttle/:shuttleId/status', async (req, res) => {
       RETURNING *
     `, [status || 'idle', shuttleId]);
 
+    // Eğer durduruldu veya bittiyse aktif sefer kaydını tamamla
+    if (status === 'idle' || status === 'completed') {
+      await pool.query(`
+        UPDATE service_trips 
+        SET end_time = NOW(),
+            duration_minutes = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (NOW() - start_time)) / 60)),
+            status = 'completed',
+            end_reason = 'status_stopped'
+        WHERE shuttle_id = $1 AND status = 'in_progress'
+      `, [shuttleId]);
+    }
+
     res.json({
       success: true,
       status: status || 'idle',
@@ -641,6 +752,226 @@ app.post('/api/shuttle/:shuttleId/status', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Durak geçildiğinde sefer kaydına durak sayacı ve durak logu ekleme
+app.post('/api/shuttle/:shuttleId/stop-passed', async (req, res) => {
+  const { shuttleId } = req.params;
+  const { stop_order, stop_name, stop_id, planned_eta, trip_type } = req.body;
+  try {
+    // Aktif sefer kaydını bul
+    const tripRes = await pool.query(`
+      SELECT * FROM service_trips 
+      WHERE shuttle_id = $1 AND status = 'in_progress'
+      ORDER BY start_time DESC LIMIT 1
+    `, [shuttleId]);
+
+    let delayMinutes = 0;
+    if (planned_eta && planned_eta.includes(':')) {
+      const now = new Date();
+      const [plannedH, plannedM] = planned_eta.split(':').map(Number);
+      const currentMinsTotal = now.getHours() * 60 + now.getMinutes();
+      const plannedMinsTotal = plannedH * 60 + plannedM;
+      delayMinutes = currentMinsTotal - plannedMinsTotal;
+    }
+
+    if (tripRes.rows.length > 0) {
+      const trip = tripRes.rows[0];
+      await pool.query(`
+        UPDATE service_trips 
+        SET stops_visited = stops_visited + 1
+        WHERE id = $1
+      `, [trip.id]);
+
+      // Mükerrerliği önleyerek durak logu kaydet
+      const existingLog = await pool.query(`
+        SELECT id FROM trip_stop_logs 
+        WHERE trip_id = $1 AND (stop_order = $2 OR stop_name = $3)
+        LIMIT 1
+      `, [trip.id, stop_order || 1, stop_name]);
+
+      if (existingLog.rows.length === 0) {
+        await pool.query(`
+          INSERT INTO trip_stop_logs (
+            trip_id, shuttle_id, company_id, stop_id, stop_order,
+            stop_name, trip_type, planned_eta, reached_at, delay_minutes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
+        `, [
+          trip.id, shuttleId, trip.company_id, stop_id || null,
+          stop_order || 1, stop_name || 'Durak',
+          trip.trip_type || trip_type || 'morning',
+          planned_eta || null, delayMinutes
+        ]);
+      }
+    } else {
+      const sRes = await pool.query('SELECT company_id FROM shuttles WHERE id = $1', [shuttleId]);
+      const compId = sRes.rows.length > 0 ? sRes.rows[0].company_id : 1;
+      await pool.query(`
+        INSERT INTO trip_stop_logs (
+          trip_id, shuttle_id, company_id, stop_id, stop_order,
+          stop_name, trip_type, planned_eta, reached_at, delay_minutes
+        ) VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+      `, [
+        shuttleId, compId, stop_id || null, stop_order || 1,
+        stop_name || 'Durak', trip_type || 'morning',
+        planned_eta || null, delayMinutes
+      ]);
+    }
+
+    res.json({ success: true, stop_order, stop_name, delay_minutes: delayMinutes });
+  } catch (err) {
+    console.error('Stop passed error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Şirket Sefer Geçmişi ve Günlük Raporlama API'si (Yıllık / Aylık / Günlük + Durak Logları)
+app.get('/api/company/:companyId/trips', async (req, res) => {
+  const { companyId } = req.params;
+  const { date, shuttleId, tripType, range } = req.query;
+
+  try {
+    let conditions = ['t.company_id = $1'];
+    let params = [companyId];
+
+    if (date && date !== 'all') {
+      params.push(date);
+      conditions.push(`t.trip_date = $${params.length}`);
+    } else if (range === 'week') {
+      conditions.push(`t.trip_date >= CURRENT_DATE - INTERVAL '7 days'`);
+    } else if (range === 'month') {
+      conditions.push(`t.trip_date >= CURRENT_DATE - INTERVAL '30 days'`);
+    } else if (range === 'year') {
+      conditions.push(`t.trip_date >= CURRENT_DATE - INTERVAL '365 days'`);
+    }
+
+    if (shuttleId && shuttleId !== 'all') {
+      params.push(shuttleId);
+      conditions.push(`t.shuttle_id = $${params.length}`);
+    }
+
+    if (tripType && tripType !== 'all') {
+      params.push(tripType);
+      conditions.push(`t.trip_type = $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const tripsRes = await pool.query(`
+      SELECT t.*,
+             to_char(t.trip_date, 'DD.MM.YYYY') as date_formatted,
+             to_char(t.start_time, 'HH24:MI:SS') as start_time_formatted,
+             to_char(t.end_time, 'HH24:MI:SS') as end_time_formatted
+      FROM service_trips t
+      ${whereClause}
+      ORDER BY t.start_time DESC
+      LIMIT 300
+    `, params);
+
+    const trips = tripsRes.rows;
+
+    // Seferlerin durak giriş çizelgesini (stop_logs) ekle
+    if (trips.length > 0) {
+      const tripIds = trips.map(t => t.id);
+      const stopLogsRes = await pool.query(`
+        SELECT sl.*,
+               to_char(sl.reached_at, 'HH24:MI:SS') as reached_time_formatted
+        FROM trip_stop_logs sl
+        WHERE sl.trip_id = ANY($1::int[])
+        ORDER BY sl.stop_order ASC, sl.reached_at ASC
+      `, [tripIds]);
+
+      const logMap = {};
+      stopLogsRes.rows.forEach(log => {
+        if (!logMap[log.trip_id]) logMap[log.trip_id] = [];
+        logMap[log.trip_id].push(log);
+      });
+
+      trips.forEach(t => {
+        t.stop_logs = logMap[t.id] || [];
+      });
+    }
+
+    // İstatistikler (KPI)
+    const statsRes = await pool.query(`
+      SELECT 
+        COUNT(*) as total_count,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
+        COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as active_count,
+        COALESCE(ROUND(AVG(CASE WHEN status = 'completed' THEN duration_minutes END)), 0) as avg_duration_mins,
+        COALESCE(SUM(passenger_count), 0) as total_passengers
+      FROM service_trips t
+      ${whereClause}
+    `, params);
+
+    res.json({
+      success: true,
+      trips,
+      stats: statsRes.rows[0] || {
+        total_count: 0,
+        completed_count: 0,
+        active_count: 0,
+        avg_duration_mins: 0,
+        total_passengers: 0
+      }
+    });
+  } catch (err) {
+    console.error('Trips list error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Firma Sahipleri / İK İçin: Günde Ortalama Hangi Durağa Kaçta Giriliyor Analizi API'si
+app.get('/api/company/:companyId/stop-averages', async (req, res) => {
+  const { companyId } = req.params;
+  const { shuttleId, tripType } = req.query;
+  try {
+    let conditions = ['sl.company_id = $1'];
+    let params = [parseInt(companyId)];
+
+    if (shuttleId && shuttleId !== 'all') {
+      params.push(parseInt(shuttleId));
+      conditions.push(`sl.shuttle_id = $${params.length}`);
+    }
+    if (tripType && tripType !== 'all') {
+      params.push(tripType);
+      conditions.push(`sl.trip_type = $${params.length}`);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    const avgRes = await pool.query(`
+      SELECT 
+        sl.stop_name,
+        sl.stop_order,
+        sl.planned_eta,
+        sl.trip_type,
+        COUNT(sl.id) as sample_count,
+        ROUND(AVG(EXTRACT(EPOCH FROM sl.reached_at::time))) as avg_seconds,
+        ROUND(AVG(sl.delay_minutes)) as avg_delay_minutes,
+        MAX(sl.reached_at) as last_reached_at
+      FROM trip_stop_logs sl
+      WHERE ${whereClause}
+      GROUP BY sl.stop_name, sl.stop_order, sl.planned_eta, sl.trip_type
+      ORDER BY sl.trip_type, sl.stop_order ASC
+    `, params);
+
+    const formatted = avgRes.rows.map(row => {
+      const totalSecs = parseInt(row.avg_seconds) || 0;
+      const hours = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+      return {
+        ...row,
+        avg_arrival_time: `${hours}:${mins}`,
+        last_date_formatted: row.last_reached_at ? new Date(row.last_reached_at).toLocaleDateString('tr-TR') : '-'
+      };
+    });
+
+    res.json({ success: true, averages: formatted });
+  } catch (err) {
+    console.error('Stop averages error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -853,6 +1184,150 @@ app.post('/api/shuttle/:shuttleId/passengers/:passengerId/status', async (req, r
     res.status(500).json({ error: err.message });
   }
 });
+
+// --- WEB PUSH BİLDİRİM API'LERİ (TELEFON EKRANI KAPALIYKEN VE UYGULAMA DIŞINDAYKEN BİLDİRİM) ---
+
+// 1. Tarayıcının Push kaydı yapabilmesi için Public Key'i döndür
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+// 2. Şoförün telefonundaki Push Subscription'ı veritabanına kaydet
+app.post('/api/push/subscribe', async (req, res) => {
+  const { shuttleId, subscription } = req.body;
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ error: 'Geçersiz subscription objesi' });
+  }
+
+  try {
+    const endpoint = subscription.endpoint;
+    const p256dh = subscription.keys ? subscription.keys.p256dh : '';
+    const auth = subscription.keys ? subscription.keys.auth : '';
+
+    await pool.query(`
+      INSERT INTO push_subscriptions (shuttle_id, endpoint, p256dh, auth, user_agent)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (endpoint) DO UPDATE 
+      SET shuttle_id = EXCLUDED.shuttle_id,
+          p256dh = EXCLUDED.p256dh,
+          auth = EXCLUDED.auth,
+          last_notified_at = NOW()
+    `, [shuttleId || null, endpoint, p256dh, auth, req.headers['user-agent'] || 'Mobile Browser']);
+
+    res.json({ success: true, message: 'Push subscription başarıyla kaydedildi.' });
+  } catch (err) {
+    console.error('Push subscribe error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Şoförün telefonu kilitliyken anında test bildirimi gönder (Ekranı kilitleyip test edebilmesi için)
+app.post('/api/push/test', async (req, res) => {
+  const { shuttleId, delaySeconds = 5 } = req.body;
+  try {
+    const subsRes = await pool.query(`
+      SELECT * FROM push_subscriptions 
+      WHERE shuttle_id = $1 
+      ORDER BY id DESC LIMIT 5
+    `, [shuttleId]);
+
+    if (subsRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Bu araca ait kayıtlı push aboneliği bulunamadı. Lütfen önce bildirim iznini verin.' });
+    }
+
+    // Kullanıcı ekranı kilitleyebilsin diye delay kadar asenkron bekle (Vercel serverless ortamında donmayı önler)
+    const delayMs = Math.min(Math.max((parseInt(delaySeconds) || 5), 1), 8) * 1000;
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+
+    const payload = JSON.stringify({
+      title: '🔔 Servis360 Canlı Test Bildirimi',
+      body: 'Harika! Telefon ekranınız kapalıyken bile sefer bildirimi başarıyla çalışıyor. Canlı yayını başlatmak için dokunun.',
+      url: '/driver.html?autostart=1',
+      tag: 'test-push-notification'
+    });
+
+    let sentCount = 0;
+    for (const sub of subsRes.rows) {
+      try {
+        const pushConfig = {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth }
+        };
+        await webpush.sendNotification(pushConfig, payload);
+        sentCount++;
+      } catch (e) {
+        console.warn('Push gönderim hatası:', e.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      sentCount,
+      message: `${delaySeconds} saniye sonra test bildirimi telefonunuza gönderildi (${sentCount} cihaza iletildi).`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. OTOMATİK SEFER SAATİ ARKA PLAN ZAMANLAYICISI (CRON SCHEDULER)
+// Sunucu sürekli çalışarak saati takip eder (07:15, 17:30 vb.). Saati gelen servise doğrudan push gönderir!
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const currentH = now.getHours().toString().padStart(2, '0');
+    const currentM = now.getMinutes().toString().padStart(2, '0');
+    const currentTimeStr = `${currentH}:${currentM}`;
+
+    // Başlama veya dönüş saati o anki dakikaya denk gelen servisleri bul
+    const shuttlesRes = await pool.query(`
+      SELECT s.*, c.company_name, c.workplace_name
+      FROM shuttles s
+      JOIN companies c ON s.company_id = c.id
+      WHERE s.shift_start_time = $1 OR s.return_time = $1
+    `, [currentTimeStr]);
+
+    for (const shuttle of shuttlesRes.rows) {
+      const isEvening = shuttle.return_time === currentTimeStr;
+      const tripLabel = isEvening ? 'Akşam Dönüş (Dağıtım)' : 'Sabah Toplama';
+
+      // Bu araca ait kayıtlı push subscription'ları çek (son 10 dakikada bildirim atılmamış olanlar)
+      const subsRes = await pool.query(`
+        SELECT * FROM push_subscriptions 
+        WHERE shuttle_id = $1 
+          AND (last_notified_at IS NULL OR last_notified_at < NOW() - INTERVAL '10 minutes')
+      `, [shuttle.id]);
+
+      if (subsRes.rows.length > 0) {
+        const payload = JSON.stringify({
+          title: `⏰ ${shuttle.plate}: ${tripLabel} Saati Geldi!`,
+          body: `Saat ${currentTimeStr}. Canlı GPS yayını başlatmak için dokunun.`,
+          url: `/driver.html?autostart=1`,
+          trip_mode: isEvening ? 'evening' : 'morning'
+        });
+
+        for (const sub of subsRes.rows) {
+          try {
+            const pushConfig = {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth }
+            };
+            await webpush.sendNotification(pushConfig, payload);
+            await pool.query('UPDATE push_subscriptions SET last_notified_at = NOW() WHERE id = $1', [sub.id]);
+            console.log(`📡 [Web Push] ${shuttle.plate} için ${tripLabel} bildirimi telefon ekranı kapalıyken başarıyla gönderildi!`);
+          } catch (e) {
+            console.warn(`Push gönderilemedi (${sub.id}):`, e.message);
+            if (e.statusCode === 410 || e.statusCode === 404) {
+              await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // Sessiz hata yakalama
+  }
+}, 30000); // Her 30 saniyede bir kontrol et
 
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {

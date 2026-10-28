@@ -145,6 +145,13 @@
             <span>Canlı Servis Takip</span>
           </button>
 
+          <!-- 6. Menü: Sefer Geçmişi & Günlük Kayıtlar -->
+          <button class="sidebar-item" id="btnNavCompanyTrips" onclick="navigateTo('companyTrips')">
+            <span>📊</span>
+            <span>Sefer Kayıtları & Rapor</span>
+            <span class="badge" id="badgeTripTodayCount" style="background: rgba(16,185,129,0.2); color:#34d399;">0</span>
+          </button>
+
           <!-- 6. Şoför Mobil Kokpit Uygulaması -->
           <a href="/driver.html" target="_blank" class="sidebar-item" style="text-decoration: none; color: #34d399; background: rgba(16,185,129,0.1); border: 1px dashed rgba(16,185,129,0.3); margin-top: 0.5rem;">
             <span>📱</span>
@@ -538,42 +545,193 @@
                 <div id="leafletMap"></div>
               </div>
 
-              <!-- Test / Canlı Simülasyon Kontrolleri -->
-              <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
-                <button class="btn-action success" onclick="simulateMethodBAutoStart('morning')" title="Sabah servis saati gelince canlı konumu başlatır">
-                  <span>⏰ 07:15 Sabah Başlat</span>
-                </button>
-                <button class="btn-action primary" onclick="simulateMethodBAutoStart('evening')" style="background: #0284c7; color: #fff;" title="Akşam dönüş saati (16:45) gelince canlı konumu başlatır">
-                  <span>🌇 16:45 Dönüş Başlat</span>
-                </button>
-                <button class="btn-action primary" id="btnToggleAutoDrive" onclick="toggleAutoDrive()" style="background: var(--accent-blue); color: #fff;" title="Aracı gerçek yollar boyunca otomatik sürüşe geçirir">
-                  <span id="txtToggleAutoDrive">▶️ Canlı Sürüşü Başlat</span>
-                </button>
-                <button class="btn-action secondary" onclick="stepShuttleProgress()" title="Manuel olarak birkaç adım ilerletir">
-                  <span>⏩ Manuel Adım İlerlet</span>
-                </button>
-                <button class="btn-action secondary" onclick="simulateArrivalGeofence()" title="Aracı doğrudan varış noktasına sokar">
-                  <span>🏁 Varış Noktasına Ulaştı</span>
-                </button>
-                <button class="btn-action secondary" onclick="resetLiveSimulation()" style="font-size:0.75rem; padding: 0.35rem 0.65rem;" title="Simülasyonu başlangıç noktasına sıfırlar">
-                  <span>🔄 Başa Sar</span>
-                </button>
-              </div>
-
-              <!-- Canlı Filo Araçları Tablosu & Kartları (İK'nın tüm araçları eşzamanlı izlemesi için) -->
+              <!-- Canlı Filo Araçları Tablosu & Kartları (İK'nın araçları eşzamanlı izlemesi için) -->
               <div style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                  <div style="font-size: 0.9rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-                    <span>🚐</span>
-                    <span>Filodaki Tüm Araçların Anlık Durumu</span>
-                    <span class="badge-tag badge-success" id="txtFleetLiveCount" style="font-size: 0.7rem;">0 Araç</span>
+                  <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                    <div style="font-size: 0.9rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                      <span>🚐</span>
+                      <span>Filodaki Araçların Anlık Durumu</span>
+                      <span class="badge-tag badge-success" id="txtFleetLiveCount" style="font-size: 0.7rem;">0 Araç</span>
+                    </div>
+
+                    <!-- Canlı Filtre Seçici (Aktif vs Tüm Filo) -->
+                    <div style="display: flex; gap: 0.35rem; background: rgba(15,23,42,0.6); padding: 2px; border-radius: 8px; border: 1px solid var(--border-color);">
+                      <button type="button" class="btn-action primary" id="btnFleetFilterRunning" onclick="setFleetLiveFilter('running')" style="padding: 0.25rem 0.65rem; font-size: 0.725rem;">
+                        🟢 Sadece Seferdeki Canlı Araçlar
+                      </button>
+                      <button type="button" class="btn-action secondary" id="btnFleetFilterAll" onclick="setFleetLiveFilter('all')" style="padding: 0.25rem 0.65rem; font-size: 0.725rem;">
+                        🌐 Tüm Araçlar
+                      </button>
+                    </div>
                   </div>
-                  <span style="font-size: 0.725rem; color: var(--text-muted);">Her 2.5 saniyede otomatik senkronize edilir</span>
+                  <span style="font-size: 0.725rem; color: var(--text-muted);">Gerçek GPS verisi • Her 2.5 saniyede senkron</span>
                 </div>
                 <div id="containerFleetLiveCards" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem;">
                   <!-- JS ile doldurulacak -->
                 </div>
               </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- =================================================================
+             VIEW C6: MÜŞTERİ - SEFER GEÇMİŞİ & GÜNLÜK RAPORLAMA (YILLIK ARŞİV)
+             ================================================================= -->
+        <section class="view-section" id="viewCompanyTrips">
+          
+          <!-- Üst KPI İstatistik Kartları -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="card" style="padding: 1.1rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #3b82f6;">
+              <div style="font-size: 2rem;">🏁</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">TOPLAM SEFER SAYISI</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #fff;" id="statTotalTrips">0</div>
+                <div style="font-size: 0.7rem; color: #34d399;" id="statCompletedSubText">0 Tamamlandı</div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 1.1rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #10b981;">
+              <div style="font-size: 2rem;">⏱️</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">ORTALAMA SEFER SÜRESİ</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #34d399;" id="statAvgDuration">-- dk</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">En son durağa varış ortalaması</div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 1.1rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #8b5cf6;">
+              <div style="font-size: 2rem;">👥</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">TAŞINAN PERSONEL / ÖĞRENCİ</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #c4b5fd;" id="statTotalPassengers">0</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">Kayıtlı yolcu hacmi</div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 1.1rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #f59e0b;">
+              <div style="font-size: 2rem;">📅</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">BUGÜNKÜ SEFERLER</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #fbbf24;" id="statTodayTrips">0</div>
+                <div style="font-size: 0.7rem; color: #34d399;" id="statActiveTripsSubText">0 Aktif Sefer</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filtreleme ve Arama Çubuğu -->
+          <div class="card" style="margin-bottom: 1.25rem; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              
+              <!-- Hızlı Zaman Butonları -->
+              <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                <button type="button" class="btn-action primary" id="btnTripRangeToday" onclick="setTripTimeRange('today')" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                  📅 Bugün
+                </button>
+                <button type="button" class="btn-action secondary" id="btnTripRangeWeek" onclick="setTripTimeRange('week')" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                  Son 7 Gün
+                </button>
+                <button type="button" class="btn-action secondary" id="btnTripRangeMonth" onclick="setTripTimeRange('month')" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                  Bu Ay
+                </button>
+                <button type="button" class="btn-action secondary" id="btnTripRangeYear" onclick="setTripTimeRange('year')" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                  Tüm Yıl
+                </button>
+              </div>
+
+              <!-- Filtre Seçiciler -->
+              <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                <div>
+                  <input type="date" id="filterTripDateInput" class="form-control" style="padding: 0.35rem 0.65rem; font-size: 0.775rem;" onchange="onTripDateChange(this.value)">
+                </div>
+                <div>
+                  <select id="filterTripShuttleSelect" class="form-control" style="padding: 0.35rem 0.65rem; font-size: 0.775rem;" onchange="loadCompanyTrips()">
+                    <option value="all">🚐 Tüm Araçlar</option>
+                  </select>
+                </div>
+                <div>
+                  <select id="filterTripTypeSelect" class="form-control" style="padding: 0.35rem 0.65rem; font-size: 0.775rem;" onchange="loadCompanyTrips()">
+                    <option value="all">🔁 Sabah & Akşam</option>
+                    <option value="morning">🌅 Sabah Toplama</option>
+                    <option value="evening">🌇 Akşam Dağıtım</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-action secondary" onclick="exportTripsCsv()" style="padding: 0.35rem 0.75rem; font-size: 0.775rem;" title="Excel / CSV Olarak İndir">
+                  📥 Excel / CSV İndir
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Durak Bazında Ortalama Giriş Saatleri & Gecikme Analizi (Kullanıcı Talebi: Firma Sahipleri Görsün) -->
+          <div class="card" style="margin-bottom: 1.25rem; padding: 1.25rem; border: 1px solid rgba(59,130,246,0.3); background: rgba(15,23,42,0.85);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <span style="font-size: 1.3rem;">📊</span>
+                <div>
+                  <h4 style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 0.2rem;">Durak Bazında Ortalama Giriş Saatleri & Zamanlama Analizi</h4>
+                  <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">Araçların geçmiş seferlerde hangi durağa günde ortalama kaçta girdiği ve planlanan saate göre gecikme durumu</p>
+                </div>
+              </div>
+              <button type="button" class="btn-action secondary" onclick="loadStopAverages()" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                🔄 Analizi Tazele
+              </button>
+            </div>
+
+            <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+              <table class="data-table" style="font-size: 0.825rem;">
+                <thead>
+                  <tr>
+                    <th>İstikamet</th>
+                    <th>Sıra</th>
+                    <th>Durak Adı</th>
+                    <th>Planlanan Saat (ETA)</th>
+                    <th>⏱️ Ortalama Giriş Saati</th>
+                    <th>Sapma / Durum</th>
+                    <th>Kayıt Sayısı</th>
+                    <th>Son Giriş Tarihi</th>
+                  </tr>
+                </thead>
+                <tbody id="companyStopAveragesTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                      Durak analiz verileri yükleniyor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Sefer Listesi Tablosu -->
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tarih</th>
+                    <th>Araç / Plaka</th>
+                    <th>Şoför</th>
+                    <th>Sefer Türü</th>
+                    <th>Güzergah</th>
+                    <th>⏰ Kalkış Saati</th>
+                    <th>🏁 Bitiş Saati</th>
+                    <th>⏱️ Sefer Süresi</th>
+                    <th>Durak Sayısı</th>
+                    <th>Durak Detayları</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody id="companyTripsTableBody">
+                  <tr>
+                    <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                      Sefer kayıtları yükleniyor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -903,6 +1061,48 @@
           <button type="submit" class="btn-action success" id="btnSubmitPassengerModal">Kaydet & Servise Ata</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SEFER DURAK GİRİŞ ÇİZELGESİ DETAYI (Kullanıcı Talebi: Hangi durağa kaçta girdi logları) -->
+  <div class="modal-overlay" id="modalTripStopDetails">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.25rem;">⏱️</span>
+          <h3 style="color:#fff; font-size:1.15rem; font-weight:700;" id="txtModalTripStopTitle">Sefer Durak Giriş Çizelgesi</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modalTripStopDetails')">&times;</button>
+      </div>
+
+      <div style="padding: 1rem 0;">
+        <div id="txtModalTripMeta" style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 1rem; padding: 0.75rem 1rem; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 8px; line-height: 1.5;"></div>
+        
+        <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+          <table class="data-table" style="font-size: 0.825rem;">
+            <thead>
+              <tr>
+                <th>Sıra</th>
+                <th>Durak Adı</th>
+                <th>Planlanan Saat</th>
+                <th>⏱️ Gerçek Giriş Saati</th>
+                <th>Zamanlama Durumu</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTripStopLogs">
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                  Durak kayıtları bulunamadı.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex; justify-content: flex-end; margin-top:1.25rem;">
+          <button type="button" class="btn-action primary" onclick="closeModal('modalTripStopDetails')">Kapat</button>
+        </div>
+      </div>
     </div>
   </div>
 
