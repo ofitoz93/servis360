@@ -62,12 +62,14 @@
       <!-- Hızlı Seçim Butonları -->
       <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
         <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">HIZLI DENEME GİRİŞLERİ:</span>
-        <div style="display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;">
+          <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('ik@akintekstil.com', '123456')">
+            🏢 Akın Tekstil (41 B 1441 Şirket Paneli)
+          </button>
           <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('admin@servis360.com', '123456')">
             🏢 Admin Girişi
           </button>
-          <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('41 ABC 41', '123456')">
-            🚐 41 ABC 41 (Şoför)
+          <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('41 B 1441', '123456')">
+            🚐 41 B 1441 (Şoför)
           </button>
           <button type="button" class="btn-action secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="quickHomeLogin('PRS-1005', '123456')">
             👤 PRS-1005 (Personel)
@@ -557,11 +559,11 @@
 
                     <!-- Canlı Filtre Seçici (Aktif vs Tüm Filo) -->
                     <div style="display: flex; gap: 0.35rem; background: rgba(15,23,42,0.6); padding: 2px; border-radius: 8px; border: 1px solid var(--border-color);">
-                      <button type="button" class="btn-action primary" id="btnFleetFilterRunning" onclick="setFleetLiveFilter('running')" style="padding: 0.25rem 0.65rem; font-size: 0.725rem;">
-                        🟢 Sadece Seferdeki Canlı Araçlar
+                      <button type="button" class="btn-action primary" id="btnFleetFilterAll" onclick="setFleetLiveFilter('all')" style="padding: 0.25rem 0.65rem; font-size: 0.725rem;">
+                        🌐 Tüm Filo (Haritada Göster)
                       </button>
-                      <button type="button" class="btn-action secondary" id="btnFleetFilterAll" onclick="setFleetLiveFilter('all')" style="padding: 0.25rem 0.65rem; font-size: 0.725rem;">
-                        🌐 Tüm Araçlar
+                      <button type="button" class="btn-action secondary" id="btnFleetFilterRunning" onclick="setFleetLiveFilter('running')" style="padding: 0.25rem 0.65rem; font-size: 0.725rem;">
+                        🟢 Sadece Seferdeki Canlı Araçlar
                       </button>
                     </div>
                   </div>

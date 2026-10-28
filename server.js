@@ -7,7 +7,14 @@ const webpush = require('web-push');
 const app = express();
 const PORT = process.env.PORT || 4173;
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.ipujjwfhdsxusgwnjhnc:5bT5YVLNVwutR2tW@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true';
+let rawConn = process.env.DATABASE_URL || 'postgresql://postgres.ipujjwfhdsxusgwnjhnc:5bT5YVLNVwutR2tW@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true';
+if (rawConn.includes('pooler.supabase.com:5432')) {
+  rawConn = rawConn.replace(':5432', ':6543');
+}
+if (!rawConn.includes('pgbouncer=true')) {
+  rawConn += (rawConn.includes('?') ? '&' : '?') + 'pgbouncer=true';
+}
+const connectionString = rawConn;
 
 const pool = new Pool({
   connectionString,
@@ -603,8 +610,22 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         const distance = R * c;
 
-        // Sefer en az 20 saniye önce başlamış olmalı ve hedef çite girmeli
-        if (distance <= radiusMeters && tripSeconds > 20) {
+        // Başlangıç noktasından ne kadar uzaklaştı?
+        let distanceFromStart = 9999;
+        if (trip && trip.start_lat && trip.start_lng) {
+          const sPhi1 = lat * Math.PI / 180;
+          const sPhi2 = parseFloat(trip.start_lat) * Math.PI / 180;
+          const sDPhi = (parseFloat(trip.start_lat) - lat) * Math.PI / 180;
+          const sDLam = (parseFloat(trip.start_lng) - lng) * Math.PI / 180;
+          const sA = Math.sin(sDPhi/2) * Math.sin(sDPhi/2) +
+                     Math.cos(sPhi1) * Math.cos(sPhi2) *
+                     Math.sin(sDLam/2) * Math.sin(sDLam/2);
+          distanceFromStart = R * 2 * Math.atan2(Math.sqrt(sA), Math.sqrt(1-sA));
+        }
+
+        // Sefer en az 3 dakika sürmüş olmalı, başlangıç noktasından en az 250m uzaklaşmış olmalı ve hedef çite girmeli
+        const hasActuallyTraveled = distanceFromStart > 250;
+        if (distance <= radiusMeters && tripSeconds >= 180 && hasActuallyTraveled) {
           arrived = true;
           reachedStopName = firstStop.stop_name || 'Sabahki 1. Durak';
           await pool.query("UPDATE shuttles SET current_status = 'completed' WHERE id = $1", [shuttleId]);
@@ -648,8 +669,22 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       const distance = R * c;
 
-      // Sefer en az 20 saniye önce başlamış olmalı ve varış çitine girmeli
-      if (distance <= radiusMeters && tripSeconds > 20) {
+      // Başlangıç noktasından ne kadar uzaklaştı?
+      let distanceFromStart = 9999;
+      if (trip && trip.start_lat && trip.start_lng) {
+        const sPhi1 = lat * Math.PI / 180;
+        const sPhi2 = parseFloat(trip.start_lat) * Math.PI / 180;
+        const sDPhi = (parseFloat(trip.start_lat) - lat) * Math.PI / 180;
+        const sDLam = (parseFloat(trip.start_lng) - lng) * Math.PI / 180;
+        const sA = Math.sin(sDPhi/2) * Math.sin(sDPhi/2) +
+                   Math.cos(sPhi1) * Math.cos(sPhi2) *
+                   Math.sin(sDLam/2) * Math.sin(sDLam/2);
+        distanceFromStart = R * 2 * Math.atan2(Math.sqrt(sA), Math.sqrt(1-sA));
+      }
+
+      // Sefer en az 3 dakika sürmüş olmalı, başlangıç yerinden en az 250m hareket etmiş olmalı ve varış çitine girmeli
+      const hasActuallyTraveled = distanceFromStart > 250;
+      if (distance <= radiusMeters && tripSeconds >= 180 && hasActuallyTraveled) {
         arrived = true;
         reachedStopName = workplace.workplace_name;
         await pool.query("UPDATE shuttles SET current_status = 'arrived' WHERE id = $1", [shuttleId]);

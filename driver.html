@@ -916,6 +916,20 @@
           `⏰ ${activeShuttle.plate}: ${shiftName} Saati Geldi!`,
           `Saat ${shiftTimeStr}. Canlı GPS yayını otomatik başlatıldı. Koordinatlar şirket paneline aktarılıyor.`
         );
+
+        // 1. Sunucuya anında 'running' statüsü bildir (GPS uydusu beklenmeden haritada yeşile dönsün)
+        fetch(`/api/shuttle/${activeShuttle.id}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'running' })
+        }).catch(() => {});
+
+        // 2. Bilinen son koordinat varsa hemen 1. paketi yolla ki haritada anında belirtsin
+        const fallbackLat = lastSentCoord?.lat || activeShuttle.last_lat;
+        const fallbackLng = lastSentCoord?.lng || activeShuttle.last_lng;
+        if (fallbackLat && fallbackLng) {
+          sendLocationToServer(parseFloat(fallbackLat), parseFloat(fallbackLng), 0, 0, 10, mode);
+        }
       }
 
       updateUiState();
