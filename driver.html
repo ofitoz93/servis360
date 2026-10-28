@@ -593,6 +593,10 @@
           </button>
         </div>
 
+        <button type="button" class="btn-main" onclick="testNotificationDelay(5)" style="padding: 0.75rem; font-size: 0.85rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #93c5fd;">
+          🔔 5 sn Sonra Başlık Bildirimi Test Et (Arka Plan)
+        </button>
+
         <button type="button" class="btn-main btn-secondary" onclick="syncShuttleDetailsFromServer(true)" style="padding: 0.65rem; font-size: 0.8rem;">
           🔄 Sunucudan Saatleri Şimdi Yenile
         </button>
@@ -896,6 +900,16 @@
       playAlertSound();
       if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 500]);
 
+      // Sistem Bildirimi Fırlat (Ekranın tepesinden inen başlık bildirimi)
+      if (activeShuttle) {
+        const shiftTimeStr = mode === 'evening' ? (activeShuttle.return_time || '11:45') : (activeShuttle.shift_start_time || '07:15');
+        const shiftName = mode === 'evening' ? 'Akşam Dönüş' : 'Sabah Seferi';
+        sendSystemNotification(
+          `⏰ ${activeShuttle.plate}: ${shiftName} Saati Geldi!`,
+          `Saat ${shiftTimeStr}. Canlı GPS yayını otomatik başlatıldı. Koordinatlar şirket paneline aktarılıyor.`
+        );
+      }
+
       updateUiState();
 
       // GPS Yayını
@@ -997,6 +1011,58 @@
       }
 
       alert('🏁 SÜRÜŞ BİTİRİLDİ!\n\nCanlı GPS yayını kapatıldı ve şirket paneline iletildi.\n\nSistem tekrar nöbet moduna döndü.');
+    }
+
+    async function sendSystemNotification(title, body) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') {
+        console.warn('Bildirim izni yok veya desteklenmiyor');
+        return;
+      }
+      try {
+        const notifOptions = {
+          body: body,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: 'servis360-active-alert-' + Date.now(),
+          renotify: true,
+          requireInteraction: true,
+          vibrate: [300, 150, 300, 150, 300],
+          actions: [
+            { action: 'open', title: '▶️ Aç & Canlı Konumu Gör' }
+          ],
+          data: { url: '/driver.html' }
+        };
+
+        if ('serviceWorker' in navigator) {
+          const reg = swRegistration || (await navigator.serviceWorker.ready);
+          if (reg && reg.showNotification) {
+            await reg.showNotification(title, notifOptions);
+            return;
+          }
+        }
+        new Notification(title, notifOptions);
+      } catch (err) {
+        console.warn('sendSystemNotification hatası:', err);
+      }
+    }
+
+    async function testNotificationDelay(seconds = 5) {
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+          alert('Bildirim izni verilmediği için test yapılamaz.');
+          return;
+        }
+      }
+
+      alert(`⏱️ ${seconds} SANİYE SAYACI BAŞLADI!\n\nŞimdi hemen ana ekrana dönün veya başka bir uygulamaya geçin.\n${seconds} saniye sonra ekranın tepesinden bildirim düşecek.`);
+
+      setTimeout(() => {
+        sendSystemNotification(
+          `🔔 ${activeShuttle ? activeShuttle.plate : 'Servis360'}: Test Bildirimi`,
+          `Harika! Uygulama arka plandayken bildirim başarıyla telefonunuza düştü.`
+        );
+      }, seconds * 1000);
     }
 
     function manualStartTracking() {
