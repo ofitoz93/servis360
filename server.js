@@ -7,10 +7,13 @@ const webpush = require('web-push');
 const app = express();
 const PORT = process.env.PORT || 4173;
 
-const connectionString = 'postgresql://postgres.ipujjwfhdsxusgwnjhnc:5bT5YVLNVwutR2tW@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres';
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.ipujjwfhdsxusgwnjhnc:5bT5YVLNVwutR2tW@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true';
 
 const pool = new Pool({
   connectionString,
+  max: 5,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
   ssl: {
     rejectUnauthorized: false
   }
