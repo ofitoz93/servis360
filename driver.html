@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Servis360 Şoför - Canlı GPS Kokpiti & Yolcu Listesi</title>
+  <title>Servis360 Şoför - Otomatik Sefer & Ayarlar Paneli</title>
   
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="manifest.json">
@@ -17,14 +17,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fira+Code:wght@500;700&display=swap" rel="stylesheet">
   
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-
   <style>
     :root {
       --bg-dark: #080c14;
-      --card-bg: rgba(15, 23, 42, 0.9);
-      --border-color: rgba(255, 255, 255, 0.08);
+      --card-bg: rgba(15, 23, 42, 0.95);
+      --border-color: rgba(255, 255, 255, 0.1);
       --accent-blue: #3b82f6;
       --accent-cyan: #06b6d4;
       --accent-green: #10b981;
@@ -81,32 +78,26 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.6rem;
     }
 
     .brand-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+      font-size: 1.5rem;
     }
 
     .brand-title h1 {
-      font-size: 1.05rem;
+      font-size: 1.1rem;
       font-weight: 800;
-      color: #fff;
+      background: linear-gradient(135deg, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .brand-title span {
-      font-size: 0.675rem;
+      font-size: 0.7rem;
       color: var(--accent-cyan);
+      display: block;
       font-weight: 700;
-      text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
@@ -116,18 +107,30 @@
       gap: 0.4rem;
       padding: 0.35rem 0.75rem;
       border-radius: 9999px;
-      font-size: 0.725rem;
-      font-weight: 700;
-      background: rgba(148, 163, 184, 0.12);
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-color);
       color: var(--text-muted);
-      border: 1px solid rgba(148, 163, 184, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .status-pill.idle {
+      border-color: rgba(148, 163, 184, 0.3);
+      color: #94a3b8;
+    }
+
+    .status-pill.waiting {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
     }
 
     .status-pill.active {
       background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
       color: #34d399;
-      border-color: rgba(16, 185, 129, 0.3);
-      animation: pulseBorder 2s infinite;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
     }
 
     .status-dot {
@@ -137,22 +140,25 @@
       background: currentColor;
     }
 
-    @keyframes pulseBorder {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-      50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    .status-pill.active .status-dot {
+      animation: pulseDot 1.5s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.6; }
     }
 
     .container {
-      position: relative;
+      flex: 1;
+      padding: 1rem;
+      max-width: 600px;
+      margin: 0 auto;
+      width: 100%;
       z-index: 1;
-      padding: 1.25rem;
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      max-width: 520px;
-      margin: 0 auto;
-      width: 100%;
-      flex: 1;
     }
 
     .card {
@@ -160,7 +166,12 @@
       border: 1px solid var(--border-color);
       border-radius: 16px;
       padding: 1.25rem;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 0.85rem;
     }
 
     .form-group label {
@@ -168,503 +179,210 @@
       font-size: 0.775rem;
       font-weight: 700;
       color: var(--text-muted);
-      margin-bottom: 0.45rem;
+      margin-bottom: 0.35rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     .form-control {
       width: 100%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      color: #fff;
       padding: 0.85rem 1rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      color: #fff;
       font-size: 0.95rem;
-      font-weight: 600;
       outline: none;
-      transition: all 0.2s ease;
+      transition: all 0.2s;
     }
 
     .form-control:focus {
       border-color: var(--accent-blue);
+      background: rgba(255, 255, 255, 0.07);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
     }
 
-    /* Shift Cards */
-    .shift-times-box {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 0.9rem;
-      margin-top: 0.75rem;
-    }
-
-    .shift-col {
-      text-align: center;
-    }
-
-    .shift-title {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .shift-val {
-      font-family: 'Fira Code', monospace;
-      font-size: 1.25rem;
-      font-weight: 800;
-      margin-top: 0.2rem;
-    }
-
-    /* Telemetry */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-      margin-top: 0.75rem;
-    }
-
-    .metric-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 0.85rem;
-      text-align: center;
-    }
-
-    .metric-val {
-      font-family: 'Fira Code', monospace;
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: var(--accent-cyan);
-    }
-
-    .metric-label {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-      text-transform: uppercase;
-    }
-
-    /* Buttons */
-    .btn-action-gps {
+    /* Ana Düğmeler */
+    .btn-main {
       width: 100%;
+      padding: 1rem;
+      border-radius: 12px;
       border: none;
-      border-radius: 16px;
-      padding: 1.2rem;
-      font-size: 1.1rem;
       font-weight: 800;
+      font-size: 0.95rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.75rem;
-      transition: all 0.25s ease;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      gap: 0.5rem;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
-    .btn-action-gps.start {
+    .btn-main:active {
+      transform: scale(0.98);
+    }
+
+    .btn-start {
       background: linear-gradient(135deg, #10b981, #059669);
       color: #fff;
-      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.35);
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
     }
 
-    .btn-action-gps.stop {
-      background: linear-gradient(135deg, #f43f5e, #e11d48);
+    .btn-stop {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       color: #fff;
-      box-shadow: 0 8px 25px rgba(244, 63, 94, 0.35);
-      animation: pulseBtn 2s infinite;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
     }
 
-    @keyframes pulseBtn {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.02); }
-    }
-
-    #driverMap {
-      width: 100%;
-      height: 200px;
-      border-radius: 12px;
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
       border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    /* Büyük Onay Switch Kartı */
+    .approval-box {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.2), rgba(15, 23, 42, 0.8));
+      border: 2px solid rgba(59, 130, 246, 0.5);
+      border-radius: 14px;
+      padding: 1.1rem;
+      transition: all 0.3s ease;
+    }
+
+    .approval-box.approved {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(15, 23, 42, 0.8));
+      border-color: rgba(16, 185, 129, 0.6);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+
+    .switch-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 58px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      border: 1px solid var(--border-color);
+      transition: .3s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 24px;
+      width: 24px;
+      left: 4px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #10b981;
+      border-color: #10b981;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(25px);
+    }
+
+    /* Canlı Saat & Bilgi Grid */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.65rem;
       margin-top: 0.75rem;
     }
 
-    /* Passenger List */
-    .passenger-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem 0.85rem;
+    .info-tile {
       background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-color);
       border-radius: 10px;
-      margin-bottom: 0.5rem;
+      padding: 0.75rem;
     }
 
-    .btn-board {
-      border: none;
-      border-radius: 8px;
-      padding: 0.45rem 0.85rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-board.waiting {
-      background: rgba(245, 158, 11, 0.15);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.3);
-    }
-
-    .btn-board.boarded {
-      background: rgba(16, 185, 129, 0.2);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    /* PWA Banner */
-    .pwa-notice {
-      background: rgba(14, 165, 233, 0.1);
-      border: 1px solid rgba(14, 165, 233, 0.25);
-      border-radius: 12px;
-      padding: 0.85rem;
-      font-size: 0.8rem;
-      color: #bae6fd;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-    }
-
-    /* Modal */
-    .arrival-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(8px);
-      z-index: 9999;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-
-    .arrival-card {
-      background: #0f172a;
-      border: 2px solid #10b981;
-      border-radius: 20px;
-      padding: 2rem 1.5rem;
-      text-align: center;
-      max-width: 400px;
-      width: 100%;
-    }
-
-    /* =========================================================================
-       CANLI YAYIN AKTİF BANNERI (KOKPİT ÜSTÜ GLOWING CANLI YAYIN ÇUBUĞU)
-       ========================================================================= */
-    .live-broadcast-banner {
-      background: linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(15, 23, 42, 0.95));
-      border: 2px solid #10b981;
-      border-radius: 16px;
-      padding: 1.1rem 1.25rem;
-      box-shadow: 0 0 35px rgba(16, 185, 129, 0.4), 0 10px 25px rgba(0,0,0,0.6);
-      animation: pulseLiveBorder 2.5s infinite;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-
-    @keyframes pulseLiveBorder {
-      0%, 100% {
-        border-color: #10b981;
-        box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-      }
-      50% {
-        border-color: #34d399;
-        box-shadow: 0 0 40px rgba(16, 185, 129, 0.65);
-      }
-    }
-
-    .live-banner-radar {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      position: relative;
-    }
-
-    .radar-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 14px #10b981;
-      position: relative;
-      z-index: 2;
-      animation: radarBlink 1s infinite;
-    }
-
-    .radar-ring {
-      position: absolute;
-      left: -2px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 2px solid #34d399;
-      animation: radarWave 1.6s infinite;
-    }
-
-    @keyframes radarBlink {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    @keyframes radarWave {
-      0% { transform: translateY(-50%) scale(0.6); opacity: 1; }
-      100% { transform: translateY(-50%) scale(2.4); opacity: 0; }
-    }
-
-    .live-banner-headline {
-      font-size: 0.9rem;
-      font-weight: 900;
-      color: #34d399;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-    }
-
-    .live-banner-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.35);
-      padding: 0.5rem 0.85rem;
-      border-radius: 10px;
-      border: 1px solid rgba(16, 185, 129, 0.25);
-    }
-
-    .live-banner-plate {
-      font-family: 'Fira Code', monospace;
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: #fff;
-    }
-
-    .live-banner-timer {
-      font-family: 'Fira Code', monospace;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: #a7f3d0;
-    }
-
-    .live-banner-sub {
-      font-size: 0.8rem;
-      color: #cbd5e1;
-      line-height: 1.45;
-    }
-
-    .live-banner-quick-actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.2rem;
-    }
-
-    .btn-live-quick {
-      flex: 1;
-      padding: 0.65rem 0.6rem;
-      border-radius: 10px;
-      font-size: 0.8rem;
-      font-weight: 800;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      transition: all 0.2s ease;
-    }
-
-    .btn-live-quick.stop {
-      background: rgba(244, 63, 94, 0.25);
-      color: #fecdd3;
-      border: 1px solid rgba(244, 63, 94, 0.5);
-    }
-
-    .btn-live-quick.stop:active {
-      transform: scale(0.97);
-    }
-
-    .btn-live-quick.finish {
-      background: linear-gradient(135deg, #ef4444, #b91c1c);
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
-    }
-
-    .btn-live-quick.finish:active {
-      transform: scale(0.97);
-    }
-
-    /* =========================================================================
-       ANLIK UYGULAMA İÇİ FLOATING BİLDİRİM (HEADS-UP ALERT TOAST)
-       ========================================================================= */
-    .in-app-toast {
-      position: fixed;
-      top: 14px;
-      left: 12px;
-      right: 12px;
-      max-width: 500px;
-      margin: 0 auto;
-      z-index: 100000;
-      border-radius: 16px;
-      background: rgba(15, 23, 42, 0.97);
-      border: 2px solid #3b82f6;
-      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 30px rgba(59, 130, 246, 0.45);
-      backdrop-filter: blur(16px);
-      overflow: hidden;
-    }
-
-    @keyframes slideDownToast {
-      from { transform: translateY(-130%); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes slideUpToast {
-      from { transform: translateY(0); opacity: 1; }
-      to { transform: translateY(-130%); opacity: 0; }
-    }
-
-    .in-app-toast-content {
-      padding: 1.1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-
-    .in-app-toast-header {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-    }
-
-    .in-app-toast-icon {
-      font-size: 1.6rem;
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      background: rgba(59, 130, 246, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .in-app-toast-text {
-      flex: 1;
-    }
-
-    .in-app-toast-title {
-      font-size: 0.975rem;
-      font-weight: 800;
-      color: #fff;
-      line-height: 1.25;
-    }
-
-    .in-app-toast-time {
+    .info-tile-label {
       font-size: 0.7rem;
-      color: #94a3b8;
-      font-weight: 600;
-      margin-top: 0.15rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
     }
 
-    .in-app-toast-close {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-size: 1.5rem;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0 0.35rem;
-    }
-
-    .in-app-toast-body {
-      font-size: 0.85rem;
-      color: #e2e8f0;
-      line-height: 1.45;
-    }
-
-    .in-app-toast-actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.3rem;
-    }
-
-    .toast-btn {
-      flex: 1;
-      padding: 0.7rem 0.8rem;
-      border-radius: 10px;
-      font-size: 0.825rem;
+    .info-tile-val {
+      font-size: 1.05rem;
       font-weight: 800;
-      border: none;
-      cursor: pointer;
+      color: #fff;
+      margin-top: 0.2rem;
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* İzin Çipleri */
+    .perm-chip {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      transition: all 0.2s ease;
+      justify-content: space-between;
+      padding: 0.5rem 0.75rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.775rem;
+      margin-top: 0.4rem;
     }
 
-    .toast-btn-continue {
-      background: #2563eb;
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    .perm-chip-status {
+      font-weight: 800;
+      font-size: 0.725rem;
     }
 
-    .toast-btn-continue:active {
-      transform: scale(0.97);
+    .perm-chip-status.ok { color: #34d399; }
+    .perm-chip-status.warn { color: #fbbf24; }
+    .perm-chip-status.err { color: #f87171; }
+
+    /* Radar / Glow Animasyonu */
+    .live-broadcast-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.15));
+      border: 2px solid #10b981;
+      border-radius: 14px;
+      padding: 1.1rem;
+      text-align: center;
+      animation: borderGlow 2s infinite alternate;
     }
 
-    .toast-btn-stop {
-      background: rgba(244, 63, 94, 0.25);
-      color: #fecdd3;
-      border: 1px solid rgba(244, 63, 94, 0.5);
-    }
-
-    .toast-btn-stop:active {
-      transform: scale(0.97);
+    @keyframes borderGlow {
+      from { box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
+      to { box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); }
     }
   </style>
 </head>
 <body>
   <div class="ambient-glow"></div>
-
-  <!-- Anlık Uygulama İçi Floating Bildirim (Heads-Up Alert Dropdown) -->
-  <div id="floatingInAppNotification" class="in-app-toast" style="display: none;">
-    <div class="in-app-toast-content">
-      <div class="in-app-toast-header">
-        <div class="in-app-toast-icon" id="toastIcon">🚐</div>
-        <div class="in-app-toast-text">
-          <div class="in-app-toast-title" id="toastTitle">Canlı Konum Başladı</div>
-          <div class="in-app-toast-time" id="toastTime">Şimdi</div>
-        </div>
-        <button class="in-app-toast-close" onclick="dismissInAppNotification()" title="Kapat">&times;</button>
-      </div>
-      <div class="in-app-toast-body" id="toastBody">
-        Aracınız için canlı GPS yayını başladı. Şirket yönetimi ve yolcular haritada anlık izliyor.
-      </div>
-      <div class="in-app-toast-actions">
-        <button type="button" class="toast-btn toast-btn-continue" onclick="handleToastContinue()">
-          ▶️ Devam Et
-        </button>
-        <button type="button" class="toast-btn toast-btn-stop" onclick="handleToastStop()">
-          ⏹️ Canlı Konumu Durdur
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- Header -->
   <header class="header">
@@ -672,11 +390,11 @@
       <div class="brand-icon">🚐</div>
       <div class="brand-title">
         <h1>Servis360</h1>
-        <span id="txtHeaderRole">Şoför Kokpiti</span>
+        <span id="txtHeaderRole">Şoför Ayarları & Sefer Paneli</span>
       </div>
     </div>
     <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <div class="status-pill" id="badgeGpsStatus">
+      <div class="status-pill idle" id="badgeGpsStatus">
         <span class="status-dot"></span>
         <span id="txtGpsStatus">BEKLEMEDE</span>
       </div>
@@ -687,7 +405,7 @@
   </header>
 
   <main class="container">
-    
+
     <!-- =========================================================================
          1. ŞOFÖR GİRİŞ EKRANI (LOGIN)
          ========================================================================= -->
@@ -696,633 +414,242 @@
         <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🚐</div>
         <h2 style="font-size: 1.25rem; font-weight: 800; color: #fff;">Şoför Girişi</h2>
         <p style="font-size: 0.825rem; color: var(--text-muted); margin-top: 0.25rem;">
-          Aracınızın plakası veya kullanıcı adınız ile giriş yapın.
+          Ayarları ve otomatik konum testini başlatmak için giriş yapın.
         </p>
       </div>
 
       <form onsubmit="handleDriverLoginSubmit(event)">
         <div class="form-group">
-          <label>Plaka, Personel ID veya Şoför Telefonu</label>
-          <input type="text" id="loginInputUsername" class="form-control" placeholder="Örn: 41 ABC 41, 41ABC41 veya PRS-1005" required autocomplete="username">
-          <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
-            * Plakanız (41ABC41), Personel ID'niz (PRS-1005) veya telefonunuz ile girebilirsiniz.
-          </span>
+          <label>Plaka veya Kullanıcı Adı</label>
+          <input type="text" id="loginInputUsername" class="form-control" placeholder="Örn: 41 B 1441 veya 41B1441" required autocomplete="username" value="41B1441">
         </div>
 
-        <div class="form-group" style="margin-top: 0.75rem;">
+        <div class="form-group">
           <label>Şifre</label>
-          <input type="password" id="loginInputPassword" class="form-control" placeholder="Şifreniz (Varsayılan: 123456)" required autocomplete="current-password" value="123456">
+          <input type="password" id="loginInputPassword" class="form-control" placeholder="Şifreniz" required autocomplete="current-password" value="123456">
         </div>
 
-        <button type="submit" class="btn-action-gps start" style="margin-top: 1.25rem; font-size: 1rem; padding: 1rem;" id="btnLoginSubmit">
-          <span>Giriş Yap ve Kokpiti Aç</span>
+        <button type="submit" class="btn-main btn-start" style="margin-top: 1rem;" id="btnLoginSubmit">
+          <span>Giriş Yap ve Ayarları Aç</span>
           <span>➔</span>
         </button>
       </form>
 
       <!-- Hızlı Seçim Butonları -->
       <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-        <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">HIZLI DENEME GİRİŞLERİ:</span>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="btn-board waiting" style="flex: 1;" onclick="quickLogin('41ABC41', '123456')">
-            41 ABC 41 (Plaka)
+        <span style="font-size: 0.725rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">HIZLI SEÇİM:</span>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-main btn-secondary" style="font-size: 0.8rem; padding: 0.6rem;" onclick="quickLogin('41B1441', '123456')">
+            41 B 1441 (Metin T)
           </button>
-          <button type="button" class="btn-board waiting" style="flex: 1;" onclick="quickLogin('PRS-1005', '123456')">
-            PRS-1005 (Personel ID)
-          </button>
-          <button type="button" class="btn-board waiting" style="flex: 1;" onclick="quickLogin('34OKL789', '123456')">
-            34 OKL 789 (Doğa Koleji)
+          <button type="button" class="btn-main btn-secondary" style="font-size: 0.8rem; padding: 0.6rem;" onclick="quickLogin('41ABC41', '123456')">
+            41 ABC 41 (Ahmet T)
           </button>
         </div>
       </div>
     </div>
 
     <!-- =========================================================================
-         2. ŞOFÖR AKTİF SEFER KOKPİTİ (GİRİŞ YAPILINCA GÖRÜNÜR)
+         2. ŞOFÖR AYARLAR & OTOMATİK SEFER BAŞLATMA KOKPİTİ
          ========================================================================= -->
     <div id="sectionDriverCockpit" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
-      
-      <!-- CANLI YAYIN AKTİF — DİNAMİK GLOWING KOKPİT BANNERI -->
-      <div id="bannerLiveBroadcastingActive" class="live-broadcast-banner" style="display: none;">
-        <div class="live-banner-radar">
-          <span class="radar-dot"></span>
-          <span class="radar-ring"></span>
-          <span class="live-banner-headline">🟢 CANLI KONUM YAYINDA</span>
-        </div>
-        <div class="live-banner-meta">
-          <div class="live-banner-plate" id="liveBannerPlate">41 B 1441</div>
-          <div class="live-banner-timer" id="liveBannerTimer">⏱️ Sefer Süresi: 00:00</div>
-        </div>
-        <div class="live-banner-sub" id="liveBannerSub">
-          Aracınızın anlık GPS koordinatları şirket yönetimi ve yolcular için canlı yayınlanıyor.
-        </div>
-        <div class="live-banner-quick-actions">
-          <button type="button" class="btn-live-quick stop" onclick="stopTracking()">
-            🛑 Canlı Konumu Durdur
-          </button>
-          <button type="button" class="btn-live-quick finish" onclick="handleFinishTripClick()">
-            🏁 Seferi Tamamla / Bitir
-          </button>
-        </div>
-      </div>
 
-      <!-- DİKKAT ÇEKİCİ BİLDİRİM İZNİ UYARI BANNERI -->
-      <div id="bannerRequirePushPerm" style="display: none; background: linear-gradient(135deg, rgba(30, 58, 138, 0.95), rgba(2, 132, 199, 0.95)); border: 2px solid #38bdf8; border-radius: 14px; padding: 1.1rem; color: #fff; box-shadow: 0 6px 20px rgba(2,132,199,0.4);">
-        <div style="font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
-          <span style="font-size: 1.3rem;">🔔</span> <span>KİLİTLİ EKRAN SEFER ALARMI İZNİ GEREKLİ</span>
-        </div>
-        <div style="font-size: 0.825rem; margin: 0.6rem 0; line-height: 1.45; color: #e0f2fe;">
-          Telefon ekranınız kapalıyken veya cebinizdeyken sefer saati geldiğinde telefonunuzun titreyip çalabilmesi için lütfen aşağıdaki butona dokunarak bildirim iznini aktif edin.
-        </div>
-        <button type="button" onclick="enablePushNotificationsExplicitly()" style="width: 100%; background: #22c55e; color: #fff; border: none; padding: 0.85rem; border-radius: 10px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(34,197,94,0.4);">
-          <span>🔔</span> <span>BİLDİRİM İZNİNİ AÇ & KİLİTLİ ALARMI AKTİF ET</span>
-        </button>
-      </div>
-
-      <!-- 0. Mobil Bildirim & HTTPS Bağlantı Durumu Kartı -->
-      <div class="card" id="cardNotifDiagnostic" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(59, 130, 246, 0.35);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <div style="font-size: 0.85rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
-            <span>🔔</span> <span>Mobil Bildirim & Sistem Durumu</span>
-          </div>
-          <span id="badgeNotifPerm" class="status-pill" style="font-size: 0.7rem; color: #38bdf8;">Kontrol Ediliyor...</span>
-        </div>
-
-        <!-- HTTP Uyarısı (Eğer HTTPS değilse ve localhost değilse görünür) -->
-        <div id="boxHttpsNotice" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem; font-size: 0.775rem; color: #fde68a; line-height: 1.45;">
-          <div style="font-weight: 800; margin-bottom: 0.25rem;">⚠️ DİKKAT: HTTP (Güvensiz Yerel Ağ) Bağlantısı</div>
-          <div>Android Chrome ve iOS Safari, telefonlarda <b>HTTP IP</b> üzerinden bildirim göndermeyi güvenlik sebebiyle engeller. Bildirimlerin ve butonların telefonunuza düşmesi için <b>Güvenli HTTPS</b> adresinden açmanız gerekir.</div>
-          <div style="margin-top: 0.5rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">
-            <a id="linkSwitchHttps" href="#" class="btn-board waiting" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; text-decoration: none; color: #fff; background: var(--accent-blue); border: none; font-weight: 700;">
-              🔒 Güvenli HTTPS Adresine Geç (Port 4174) ➔
-            </a>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="btn-board waiting" onclick="testMobileNotification()" style="flex: 1; min-width: 140px; padding: 0.6rem; font-size: 0.8rem; background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); color: #93c5fd; font-weight: 700;">
-            📲 Anlık Bildirim Testi
-          </button>
-          <button type="button" class="btn-board waiting" onclick="testLockedScreenPush()" style="flex: 1; min-width: 180px; padding: 0.6rem; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5); color: #6ee7b7; font-weight: 700;">
-            🔒 5 sn Sonra Kilitli Ekran Testi
-          </button>
-          <button type="button" class="btn-board waiting" onclick="reinstallPwaNotice()" style="padding: 0.6rem 0.8rem; font-size: 0.8rem; color: #cbd5e1;">
-            ℹ️ İpuçları
-          </button>
-        </div>
-        <div id="pushSubscriptionStatus" style="font-size: 0.725rem; margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.1); color: #94a3b8;">
-          🌐 Web Push (Kilitli Ekran): Kontrol ediliyor...
-        </div>
-      </div>
-
-      <!-- 1. Sefer İstikameti Seçici (Sabah Toplama vs Akşam Dönüş Dağıtımı) -->
-      <div style="display: flex; gap: 0.5rem; background: rgba(255,255,255,0.04); padding: 0.35rem; border-radius: 12px; border: 1px solid var(--border-color);">
-        <button type="button" class="btn-tab active" id="btnTripMorning" onclick="switchTripMode('morning')" style="flex: 1; padding: 0.65rem; font-size: 0.8rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.2s;">
-          🌅 Sabah: İşe / Okula (Toplama)
-        </button>
-        <button type="button" class="btn-tab" id="btnTripEvening" onclick="switchTripMode('evening')" style="flex: 1; padding: 0.65rem; font-size: 0.8rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">
-          🌇 Akşam: Eve Dönüş (Dağıtım)
-        </button>
-      </div>
-
-      <!-- Servis ve Vardiya Saatleri Kartı -->
+      <!-- 1. ARAÇ & ZAMAN BİLGİSİ -->
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <div style="font-family: 'Fira Code', monospace; font-size: 1.4rem; font-weight: 800; color: #fff;" id="txtActivePlate">41 ABC 41</div>
-            <div style="font-size: 0.8rem; color: var(--accent-cyan); font-weight: 600;" id="txtActiveCompany">Akin Tekstil Sanayi A.Ş.</div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
+              <span>🚐</span> <span id="txtPlate">41 B 1441</span>
+            </div>
+            <div style="font-size: 0.775rem; color: var(--text-muted); margin-top: 0.15rem;" id="txtDriverAndCompany">
+              Metin T • Akın Tekstil
+            </div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 0.85rem; font-weight: 700; color: #fff;" id="txtActiveDriver">Ahmet T</div>
-            <span class="status-pill" style="font-size:0.675rem; color:#60a5fa;" id="txtOpTypeBadge">Personel Servisi</span>
+            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700;">TÜRKİYE SAATİ</div>
+            <div style="font-size: 1.2rem; font-weight: 800; color: #38bdf8; font-family: 'Fira Code', monospace;" id="txtCurrentClock">
+              --:--:--
+            </div>
           </div>
         </div>
 
-        <!-- Sefer İstikameti Açıklaması -->
-        <div id="boxTripDirectionInfo" style="margin-top: 0.75rem; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 10px; padding: 0.65rem 0.85rem; font-size: 0.8rem; color: #93c5fd; display: flex; align-items: center; gap: 0.5rem;">
-          <span style="font-size: 1.1rem;">🛣️</span>
+        <div class="info-grid">
+          <div class="info-tile">
+            <div class="info-tile-label">🌅 Sabah Sefer Saati</div>
+            <div class="info-tile-val" id="txtShiftStart" style="color: #60a5fa;">07:15</div>
+          </div>
+          <div class="info-tile">
+            <div class="info-tile-label">🌇 Akşam Dönüş Saati</div>
+            <div class="info-tile-val" id="txtShiftReturn" style="color: #f59e0b;">11:45</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. ANA ONAY ALANI: OTOMATİK CANLI KONUM PAYLAŞIMI -->
+      <div class="approval-box" id="boxApprovalCard">
+        <div class="switch-container">
           <div>
-            <div style="font-weight: 700; color: #fff;" id="txtTripDirectionTitle">Sabah Seferi: Duraklardan Fabrikaya (Toplama)</div>
-            <div style="font-size: 0.725rem; color: #cbd5e1;" id="txtTripDirectionDesc">Personeller sabah duraklarından sırayla alınır ve fabrikaya ulaştırılır.</div>
+            <div style="font-size: 0.95rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
+              <span id="iconApprovalState">⚙️</span>
+              <span>OTOMATİK CANLI KONUM ONAYI</span>
+            </div>
+            <div style="font-size: 0.775rem; color: #cbd5e1; margin-top: 0.25rem; line-height: 1.35;" id="txtApprovalDesc">
+              Açık olduğunda, aracın sefer saati gelince canlı GPS yayını telefona dokunmanıza gerek kalmadan kendiliğinden başlar.
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkAutoApproval" onchange="handleApprovalToggle(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- İzin Durumları -->
+        <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div class="perm-chip">
+            <span>📍 GPS Konum Servisi</span>
+            <span class="perm-chip-status" id="permStatusGps">Kontrol Ediliyor...</span>
+          </div>
+          <div class="perm-chip">
+            <span>🔔 Kilitli Ekran Web Push Alarmı</span>
+            <span class="perm-chip-status" id="permStatusPush">Kontrol Ediliyor...</span>
+          </div>
+          <div class="perm-chip">
+            <span>💡 Ekran Uyanık Tutma (Wake Lock)</span>
+            <span class="perm-chip-status" id="permStatusWakeLock">Hazır</span>
           </div>
         </div>
 
-        <!-- Başlama ve Dönüş Saatleri -->
-        <div class="shift-times-box">
-          <div class="shift-col" style="border-right: 1px solid rgba(255,255,255,0.06);">
-            <div class="shift-title">🌅 Sabah Başlama</div>
-            <div class="shift-val" style="color: var(--accent-amber);" id="txtShiftStart">07:15</div>
-          </div>
-          <div class="shift-col">
-            <div class="shift-title">🌇 Akşam Dönüş</div>
-            <div class="shift-val" style="color: #60a5fa;" id="txtShiftReturn">16:45</div>
-          </div>
-        </div>
-
-        <!-- Otomatik Sefer Başlatma Durumu & Hızlı Başlat -->
-        <div style="margin-top: 0.75rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 0.75rem;">
-          <div style="font-size: 0.75rem; color: #34d399; font-weight: 600; margin-bottom: 0.5rem;" id="txtAutoAlarmHint">
-            ⏰ Sabah (<span id="txtHintMorning">07:15</span>) ve Akşam Dönüş (<span id="txtHintReturn">16:45</span>) saatinde GPS otomatik başlar.
-          </div>
-          <div style="display: flex; gap: 0.4rem;">
-            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem;" onclick="triggerAutoStartTrip('morning')">
-              🌅 Sabah Seferini Başlat (<span id="btnSimMornTime">07:15</span>)
-            </button>
-            <button type="button" class="btn-board waiting" style="flex: 1; font-size: 0.7rem; padding: 0.4rem; color: #60a5fa; border-color: rgba(96,165,250,0.4);" onclick="triggerAutoStartTrip('evening')">
-              🌇 Akşam Seferini Başlat (<span id="btnSimRetTime">16:45</span>)
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Dev Canlı Konum Başlat / Durdur Butonu & Seferi Bitir -->
-      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-        <button class="btn-action-gps start" id="btnToggleGps" onclick="toggleDriverGps()">
-          <span>📡</span>
-          <span id="btnGpsText">CANLI KONUMU BAŞLAT</span>
-        </button>
-        <button class="btn-action-gps stop" id="btnFinishTrip" onclick="handleFinishTripClick()" style="display: none; padding: 0.85rem; font-size: 0.95rem; background: linear-gradient(135deg, #ef4444, #b91c1c); box-shadow: 0 8px 25px rgba(239,68,68,0.35);">
-          <span>🏁 Seferi Bitir / Turu Tamamla</span>
-        </button>
-      </div>
-
-      <!-- Telemetri ve Hedef Radar Haritası -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 0.725rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;" id="lblTargetTitle">Hedef Varış Noktası</div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-top: 0.15rem;" id="txtWorkplaceName">Merkez Fabrika</div>
-          </div>
-          <span class="status-pill" style="font-size: 0.7rem; color: #f43f5e;" id="txtGeofenceRadius">180m Radar</span>
-        </div>
-
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-val" id="metricSpeed">0 <span style="font-size:0.75rem;">km/s</span></div>
-            <div class="metric-label">Anlık Hız</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-val" id="metricAccuracy">±-- <span style="font-size:0.75rem;">m</span></div>
-            <div class="metric-label">GPS Hassasiyeti</div>
-          </div>
-        </div>
-
-        <div id="driverMap"></div>
-      </div>
-
-      <!-- Bu Araca Atanan Yolcu / Öğrenci Listesi -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-          <div>
-            <h3 style="font-size: 0.95rem; font-weight: 700; color: #fff;" id="titlePassengerList">👥 Araca Atanan Yolcular</h3>
-            <span style="font-size: 0.725rem; color: var(--text-muted);" id="subtitlePassengerList">Binen yolcuları işaretleyebilirsiniz.</span>
-          </div>
-          <span class="status-pill" style="font-size: 0.7rem; color: #34d399;" id="txtPassengerCount">0 Yolcu</span>
-        </div>
-
-        <div id="containerPassengersList">
-          <!-- JS ile doldurulacak -->
-        </div>
-      </div>
-
-      <!-- PWA Yükleme Kartı & İndirme Butonu -->
-      <div class="card" style="border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06); text-align: center;">
-        <div style="font-size: 1.8rem; margin-bottom: 0.35rem;">📱</div>
-        <h4 style="font-size: 1rem; font-weight: 700; color: #fff;">Uygulamayı Telefona İndir</h4>
-        <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0.35rem 0 0.85rem 0; line-height: 1.4;">
-          Şoför kokpitini doğrudan telefonunuzun ana ekranına uygulama (PWA) olarak ekleyin.
-        </p>
-        <button type="button" class="btn-action-gps start" id="btnInstallPwa" onclick="handlePwaInstallClick()" style="padding: 0.75rem 1rem; font-size: 0.9rem; justify-content: center;">
-          <span>📲 Ana Ekrana Ekle / İndir</span>
+        <button type="button" class="btn-main btn-start" id="btnGrantAllPerms" onclick="grantAllPermissionsOnce()" style="margin-top: 0.85rem; font-size: 0.85rem; padding: 0.8rem;">
+          <span>👉 TÜM İZİNLERİ ONAYLA VE NÖBETİ BAŞLAT</span>
         </button>
       </div>
 
-      <!-- Web Push & Kilitli Ekran Bildirim Test Kartı -->
-      <div class="card" style="border: 1px solid rgba(59,130,246,0.35); background: rgba(15,23,42,0.95); margin-bottom: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
-          <div style="font-size: 0.9rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
-            <span>🔔</span>
-            <span>Kilitli Ekran & Arka Plan Bildirimi</span>
-          </div>
-          <span class="status-pill" id="badgePushStatus" style="font-size: 0.7rem; color: #34d399;">Web Push Aktif</span>
+      <!-- 3. CANLI DURUM & GÖSTERGE MONİTÖRÜ -->
+      <div class="card" id="cardStatusMonitor">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">
+          CANLI YAYIN DURUMU & SAYAÇ
         </div>
-        <p style="font-size: 0.75rem; color: #cbd5e1; line-height: 1.45; margin-bottom: 0.75rem;">
-          Şoför uygulamadan çıksa veya telefonun ekranı kilitli olsa dahi sefer saati (07:15) geldiğinde telefonun titreyip çalması için sunucu tabanlı Web Push sistemi devrededir.
-        </p>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="btn-action-gps start" onclick="testLockedScreenPushNotification()" style="flex: 1; min-width: 180px; padding: 0.65rem 0.75rem; font-size: 0.8rem; justify-content: center; background: linear-gradient(135deg, #3b82f6, #1d4ed8); box-shadow: 0 4px 15px rgba(59,130,246,0.35);">
-            <span>🔒 5 sn Sonra Kilitli Ekran Testi</span>
+
+        <!-- Bekleme Durumu Mesajı -->
+        <div id="boxWaitingStatus" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 1rem; text-align: center;">
+          <div style="font-size: 1.8rem; margin-bottom: 0.25rem;">⏳</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #fbbf24;" id="txtWaitingTitle">
+            NÖBETTE: Sefer Saati Bekleniyor
+          </div>
+          <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 0.35rem;" id="txtCountdownSub">
+            Onayınız alındı. Akşam dönüş saati (11:45) geldiğinde canlı GPS kendiliğinden başlayacaktır.
+          </div>
+        </div>
+
+        <!-- Canlı Yayın Aktif Kutusu -->
+        <div id="boxLiveBroadcasting" class="live-broadcast-box" style="display: none;">
+          <div style="font-size: 2rem; margin-bottom: 0.25rem;">📡</div>
+          <div style="font-size: 1.1rem; font-weight: 800; color: #34d399;">
+            🟢 CANLI KONUM PAYLAŞILIYOR
+          </div>
+          <div style="font-size: 0.8rem; color: #e2e8f0; margin-top: 0.25rem;">
+            Aracınızın anlık koordinatları şirket paneline canlı aktarılıyor.
+          </div>
+
+          <div class="info-grid" style="margin-top: 0.85rem; text-align: left;">
+            <div class="info-tile">
+              <div class="info-tile-label">📍 Son Koordinat</div>
+              <div class="info-tile-val" id="txtLiveCoords" style="font-size: 0.85rem;">--</div>
+            </div>
+            <div class="info-tile">
+              <div class="info-tile-label">🚗 Anlık Hız</div>
+              <div class="info-tile-val" id="txtLiveSpeed">0 km/h</div>
+            </div>
+            <div class="info-tile">
+              <div class="info-tile-label">📦 İletilen Paket</div>
+              <div class="info-tile-val" id="txtPacketCount" style="color: #34d399;">0</div>
+            </div>
+            <div class="info-tile">
+              <div class="info-tile-label">⏱️ Son İletim</div>
+              <div class="info-tile-val" id="txtLastSentTime" style="font-size: 0.85rem;">--:--:--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. HIZLI TEST & MANUEL BUTONLAR -->
+      <div class="card" style="display: flex; flex-direction: column; gap: 0.6rem;">
+        <div style="font-size: 0.775rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+          Manuel Test Butonları
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-main btn-start" id="btnManualStart" onclick="manualStartTracking()" style="flex: 1; padding: 0.75rem; font-size: 0.85rem;">
+            ▶️ Şimdi Başlat (Test)
           </button>
-          <button type="button" class="btn-board waiting" onclick="subscribeToWebPush(true)" style="padding: 0.65rem 0.85rem; font-size: 0.75rem;" title="Push Aboneliğini Tazele">
-            <span>🔄 İzni Yenile</span>
+          <button type="button" class="btn-main btn-stop" id="btnManualStop" onclick="manualStopTracking()" style="flex: 1; padding: 0.75rem; font-size: 0.85rem;">
+            ⏹️ Durdur
           </button>
         </div>
+
+        <button type="button" class="btn-main btn-secondary" onclick="syncShuttleDetailsFromServer(true)" style="padding: 0.65rem; font-size: 0.8rem;">
+          🔄 Sunucudan Saatleri Şimdi Yenile
+        </button>
       </div>
 
     </div>
 
   </main>
 
-  <!-- Hedefe Varış Modalı -->
-  <div class="arrival-overlay" id="modalArrival">
-    <div class="arrival-card">
-      <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">🎯</div>
-      <h2 style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;" id="txtArrivalTitle">Hedefe Ulaşıldı!</h2>
-      <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 1.5rem;" id="txtArrivalMsg">
-        Fabrika sanal çitine giriş yaptınız. Canlı GPS yayını personeller ve yönetim için otomatik olarak kapatıldı.
-      </p>
-      <button class="btn-action-gps start" onclick="closeArrivalModal()" style="font-size: 0.95rem; padding: 0.85rem;">
-        <span>Tamam, Seferi Bitir</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Zorunlu Konum İzni Modalı (İlk Girişte Onay İstemek İçin) -->
-  <div class="arrival-overlay" id="modalLocationRequired">
-    <div class="arrival-card" style="border-color: #f59e0b; box-shadow: 0 0 35px rgba(245,158,11,0.25);">
-      <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">📍</div>
-      <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">Konum İzni Zorunludur</h2>
-      <p style="font-size: 0.825rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 1.5rem;">
-        Servis kokpitinin çalışması ve sefer saatinde canlı konum akışının kesintisiz iletilebilmesi için konum erişimine <b>"İzin Ver"</b> seçeneğini onaylamanız zorunludur.
-      </p>
-      <button class="btn-action-gps start" onclick="requestMandatoryLocationPermission()" style="font-size: 0.95rem; padding: 0.85rem; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 8px 25px rgba(245,158,11,0.35);">
-        <span>📍 Konum İznini Onayla</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Sefer Saati Geldiğinde Konum Kapalıysa Alarm Modalı -->
-  <div class="arrival-overlay" id="modalGpsOffAlarm">
-    <div class="arrival-card" style="border-color: #ef4444; box-shadow: 0 0 45px rgba(239,68,68,0.45); animation: pulseBtn 1.2s infinite;">
-      <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">🚨</div>
-      <h2 style="font-size: 1.35rem; font-weight: 900; color: #f87171; margin-bottom: 0.5rem;">SEFER SAATİ GELDİ!</h2>
-      <p style="font-size: 0.85rem; color: #fecaca; line-height: 1.5; margin-bottom: 1.25rem;">
-        Sefer saatiniz geldi ancak telefonunuzun <b>Konum (GPS)</b> servisi kapalı veya izin verilmemiş! Canlı GPS yayınının başlayabilmesi için lütfen telefonunuzun bildirim çubuğunu indirip <b>Konumu Açın</b>.
-      </p>
-      <button class="btn-action-gps start" onclick="handleRetryGpsFromAlarm()" style="font-size: 0.95rem; padding: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 8px 25px rgba(16,185,129,0.35);">
-        <span>✅ Konumu Açtım, Canlı Yayını Başlat</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
   <script>
     let activeShuttle = null;
-    let assignedPassengers = [];
-    let activeRoute = null;
-    let activeRouteStops = [];
-    let passedStopIds = new Set();
-    let firstStop = null;
-    let lastStop = null;
-    let currentTripType = 'morning'; // 'morning' | 'evening'
-    let watchId = null;
     let isTracking = false;
-    let driverMap = null;
-    let driverMarker = null;
-    let accuracyCircle = null;
-    let destinationCircle = null;
-    let autoClockInterval = null;
-    let simInterval = null;
+    let watchId = null;
+    let gpsInterval = null;
+    let clockInterval = null;
+    let screenWakeLock = null;
     let swRegistration = null;
+    let packetCount = 0;
+    let lastSentCoord = null;
+    let isAutoApproved = false;
 
-    // Sefer Süresi Kronometresi
-    let tripDurationSeconds = 0;
-    let tripDurationInterval = null;
-
-    function startTripTimer() {
-      if (tripDurationInterval) clearInterval(tripDurationInterval);
-      const timerEl = document.getElementById('liveBannerTimer');
-      tripDurationInterval = setInterval(() => {
-        tripDurationSeconds++;
-        const mins = Math.floor(tripDurationSeconds / 60).toString().padStart(2, '0');
-        const secs = (tripDurationSeconds % 60).toString().padStart(2, '0');
-        if (timerEl) {
-          timerEl.innerText = `⏱️ Sefer Süresi: ${mins}:${secs}`;
-        }
-      }, 1000);
+    // Türkiye Saati Biçimlendirici (HH:MM ve HH:MM:SS)
+    function getTurkeyTimeStr(withSeconds = false) {
+      const now = new Date();
+      return new Intl.DateTimeFormat('tr-TR', {
+        timeZone: 'Europe/Istanbul',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: withSeconds ? '2-digit' : undefined,
+        hour12: false
+      }).format(now);
     }
 
-    function stopTripTimer() {
-      if (tripDurationInterval) {
-        clearInterval(tripDurationInterval);
-        tripDurationInterval = null;
-      }
-      tripDurationSeconds = 0;
-      const timerEl = document.getElementById('liveBannerTimer');
-      if (timerEl) {
-        timerEl.innerText = '⏱️ Sefer Süresi: 00:00';
-      }
+    // Saat dizgisini dakikaya çevirir ("11:45" -> 705)
+    function timeStrToMinutes(tStr) {
+      if (!tStr || !tStr.includes(':')) return null;
+      const [h, m] = tStr.split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
+      return h * 60 + m;
     }
 
-    // Web Audio Beep / Chime (Sıfır Gecikme ile Sentezlenen Sesler)
-    function playBeep(freq = 600, duration = 0.15) {
+    // Wake Lock: Ekranın kapanmasını engelle
+    async function acquireWakeLock() {
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch (e) {}
-    }
-
-    function playSuccessChime() {
-      playBeep(523.25, 0.15);
-      setTimeout(() => playBeep(659.25, 0.15), 130);
-      setTimeout(() => playBeep(783.99, 0.35), 260);
-    }
-
-    function playArrivalFanfare() {
-      playBeep(440, 0.12);
-      setTimeout(() => playBeep(554.37, 0.12), 120);
-      setTimeout(() => playBeep(659.25, 0.15), 240);
-      setTimeout(() => playBeep(880, 0.4), 380);
-    }
-
-    // =========================================================================
-    // ANLIK UYGULAMA İÇİ FLOATING BİLDİRİM (HEADS-UP ALERT BANNER - 0ms GECİKME)
-    // =========================================================================
-    let inAppToastTimeout = null;
-
-    function showInAppNotification(title, body, actions = [], icon = '🚐') {
-      const toastEl = document.getElementById('floatingInAppNotification');
-      if (!toastEl) return;
-
-      const titleEl = document.getElementById('toastTitle');
-      const bodyEl = document.getElementById('toastBody');
-      const iconEl = document.getElementById('toastIcon');
-      const timeEl = document.getElementById('toastTime');
-
-      if (titleEl) titleEl.innerText = title;
-      if (bodyEl) bodyEl.innerText = body;
-      if (iconEl) iconEl.innerText = icon;
-      if (timeEl) {
-        const now = new Date();
-        timeEl.innerText = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      }
-
-      // 1. Anında Ses Çal (0ms gecikme)
-      playSuccessChime();
-
-      // 2. Anında Titreşim
-      if (navigator.vibrate) {
-        navigator.vibrate([250, 100, 250]);
-      }
-
-      // 3. Ekrana Düşür
-      toastEl.style.display = 'block';
-      toastEl.style.animation = 'slideDownToast 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards';
-
-      if (inAppToastTimeout) clearTimeout(inAppToastTimeout);
-      inAppToastTimeout = setTimeout(() => {
-        dismissInAppNotification();
-      }, 7500);
-    }
-
-    function dismissInAppNotification() {
-      const toastEl = document.getElementById('floatingInAppNotification');
-      if (!toastEl) return;
-      toastEl.style.animation = 'slideUpToast 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
-      setTimeout(() => {
-        toastEl.style.display = 'none';
-      }, 300);
-      if (inAppToastTimeout) {
-        clearTimeout(inAppToastTimeout);
-        inAppToastTimeout = null;
-      }
-    }
-
-    function handleToastContinue() {
-      playBeep(700, 0.1);
-      dismissInAppNotification();
-    }
-
-    function handleToastStop() {
-      playBeep(440, 0.15);
-      dismissInAppNotification();
-      stopTracking();
-    }
-
-    // Haversine İki Nokta Arası Metre Mesafe Hesabı
-    function calcHaversineMeters(lat1, lon1, lat2, lon2) {
-      const R = 6371e3; // metres
-      const phi1 = lat1 * Math.PI / 180;
-      const phi2 = lat2 * Math.PI / 180;
-      const dPhi = (lat2 - lat1) * Math.PI / 180;
-      const dLam = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) +
-                Math.cos(phi1) * Math.cos(phi2) *
-                Math.sin(dLam/2) * Math.sin(dLam/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    }
-
-    // Mobil PWA ve Bildirim Çubuğu Uyumlu Sistem Bildirimi (Anında Düşer & Asenkron)
-    function sendMobileNotification(title, body, actions = [], tag = 'servis360-live', icon = '🚐') {
-      // 1. ÖNCE: Uygulama açıkken ekrana ANINDA ve gecikmesiz düşen Heads-Up Bildirimi
-      showInAppNotification(title, body, actions, icon);
-
-      // 2. SONRA: Telefon kilit ekranı & bildirim çubuğu için arka plan OS Push bildirimi
-      if (!('Notification' in window)) return;
-
-      const defaultActions = [
-        { action: 'continue', title: '▶️ Devam Et' },
-        { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-      ];
-
-      // Her bildirim için benzersiz zaman damgası ekle, böylece Android Chrome bildirimi birleştirmeden anında çaldırır!
-      const uniqueTag = `${tag}-${Date.now()}`;
-      const notifOptions = {
-        body: body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: uniqueTag,
-        renotify: true,
-        requireInteraction: false,
-        vibrate: [300, 150, 300],
-        actions: (actions && actions.length > 0) ? actions : defaultActions,
-        data: {
-          url: '/driver.html',
-          timestamp: Date.now()
+        if ('wakeLock' in navigator && !screenWakeLock) {
+          screenWakeLock = await navigator.wakeLock.request('screen');
+          console.log('💡 Wake Lock aktif: Telefon ekranı kapanmayacak.');
+          updatePermUi();
         }
-      };
-
-      // Asenkron ve donmasız gönder (UI'yi hiçbir şekilde bekletmez)
-      (async () => {
-        try {
-          if (Notification.permission !== 'granted') {
-            const perm = await Notification.requestPermission();
-            if (perm !== 'granted') return;
-            updateNotificationUiStatus();
-          }
-
-          if ('serviceWorker' in navigator) {
-            const reg = swRegistration || (await navigator.serviceWorker.ready);
-            if (reg && reg.showNotification) {
-              await reg.showNotification(title, notifOptions);
-              return;
-            }
-          }
-
-          new Notification(title, notifOptions);
-        } catch (err) {
-          console.warn('Sistem bildirim hatası:', err);
-        }
-      })();
-    }
-
-    function updateNotificationUiStatus() {
-      const badge = document.getElementById('badgeNotifPerm');
-      const boxHttps = document.getElementById('boxHttpsNotice');
-      const linkHttps = document.getElementById('linkSwitchHttps');
-      const bannerPerm = document.getElementById('bannerRequirePushPerm');
-      
-      const isHttps = location.protocol === 'https:';
-      const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      const isSecure = window.isSecureContext;
-
-      if (!isHttps && !isLocalhost) {
-        if (boxHttps) boxHttps.style.display = 'block';
-        if (linkHttps) linkHttps.href = `https://${location.hostname}:4174/driver.html`;
-      } else {
-        if (boxHttps) boxHttps.style.display = 'none';
-      }
-
-      if (!('Notification' in window)) {
-        if (badge) {
-          badge.innerText = '🚫 Desteklenmiyor';
-          badge.style.color = '#f87171';
-        }
-        if (bannerPerm) bannerPerm.style.display = 'none';
-        return;
-      }
-
-      if (Notification.permission === 'granted') {
-        if (badge) {
-          badge.innerText = isSecure ? '🟢 Bildirimler Aktif' : '⚠️ İzin Var (HTTPS Gerekli)';
-          badge.style.color = isSecure ? '#34d399' : '#f59e0b';
-        }
-        if (bannerPerm) bannerPerm.style.display = 'none';
-      } else if (Notification.permission === 'denied') {
-        if (badge) {
-          badge.innerText = '🔴 Engellendi (Site Ayarlarından Açın)';
-          badge.style.color = '#f87171';
-        }
-        if (bannerPerm) {
-          bannerPerm.style.display = 'block';
-          const desc = bannerPerm.querySelector('div:nth-child(2)');
-          if (desc) desc.innerText = '⚠️ Bildirim izni tarayıcı tarafından engellenmiş. Lütfen adres çubuğundaki kilit/ayar simgesine dokunup Bildirimler iznini "İzin Ver" yapın.';
-        }
-      } else {
-        // İzin bekleniyor (default)
-        if (badge) {
-          badge.innerText = '🟡 İzin Bekliyor';
-          badge.style.color = '#fbbf24';
-        }
-        if (bannerPerm) bannerPerm.style.display = 'block';
+      } catch (e) {
+        console.warn('Wake Lock hatası:', e.message);
       }
     }
 
-    async function enablePushNotificationsExplicitly() {
-      if (!('Notification' in window)) {
-        alert('Bu tarayıcı bildirimleri desteklemiyor.');
-        return;
-      }
-      try {
-        const perm = await Notification.requestPermission();
-        updateNotificationUiStatus();
-        if (perm === 'granted') {
-          await subscribeToWebPush();
-          alert('✅ Harika! Bildirim izni verildi ve telefonunuz kilitli ekran Web Push sistemine kaydedildi.\n\nArtık telefonunuz kapalı olsa bile sefer saati geldiğinde telefonunuz titreyecektir.');
-        } else {
-          alert('⚠️ Bildirim izni verilmedi. Telefon kapalıyken alarm alabilmek için tarayıcınızın adres çubuğundaki kilit simgesine dokunup bildirimlere izin vermelisiniz.');
-        }
-      } catch (err) {
-        alert('İzin hatası: ' + err.message);
+    function releaseWakeLock() {
+      if (screenWakeLock) {
+        screenWakeLock.release().catch(() => {});
+        screenWakeLock = null;
+        updatePermUi();
       }
     }
 
-    async function testMobileNotification() {
-      // 1. Doğrudan anlık bildirim fırlat
-      sendMobileNotification(
-        "✅ Servis360 Bildirim Testi",
-        "Mobil bildirimler ve [▶️ Devam Et] / [⏹️ Canlı Konumu Durdur] butonları telefonunuzda aktif çalışıyor!",
-        [
-          { action: 'continue', title: '▶️ Devam Et' },
-          { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-        ],
-        "test-notification",
-        "🔔"
-      );
-
-      // İzin yoksa istemeyi tetikle
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        try {
-          const perm = await Notification.requestPermission();
-          updateNotificationUiStatus();
-        } catch (e) {}
-      }
-    }
-
-    function reinstallPwaNotice() {
-      alert(
-        "📲 Uygulama ve Bildirim İpuçları:\n\n" +
-        "1. UYGULAMAYI YENİDEN YÜKLEME:\n" +
-        "Eğer uygulamayı daha önce ana ekrana yüklediyseniz, eski sürüm önbellekte kalmış olabilir. Eski ikonu ana ekrandan silip, bu adresi açtıktan sonra tekrar 'Ana Ekrana Ekle' yapmanız önerilir.\n\n" +
-        "2. ANDROID BİLDİRİM İZNİ:\n" +
-        "Telefonunuzun Ayarlar > Uygulamalar > Chrome (veya Servis360) > Bildirimler menüsünün 'Açık' olduğundan emin olun.\n\n" +
-        "3. GÜVENLİ HTTPS BAĞLANTISI:\n" +
-        "Telefonunuzdan bağlanırken https://192.168.3.18:4174 adresini kullanın. Açılışta 'Gelişmiş > Siteye İlerle'ye dokunun. Böylece Google Chrome mobil bildirimleri 100% aktif hale getirecektir."
-      );
-    }
-
-    // Web Push Helper: Base64 VAPID anahtarını Uint8Array'e dönüştürür
+    // VAPID Web Push Helper
     function urlBase64ToUint8Array(base64String) {
       const padding = '='.repeat((4 - base64String.length % 4) % 4);
       const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -1334,182 +661,432 @@
       return outputArray;
     }
 
-    // Telefon Kilitliyken Sunucudan Web Push Bildirimi Alma Kaydı (PushManager)
     async function subscribeToWebPush() {
-      const statusEl = document.getElementById('pushSubscriptionStatus');
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ Web Push: Tarayıcınızda Push desteği bulunamadı veya güvenli HTTPS bağlantısı yok.</span>';
-        return;
-      }
-      try {
-        const reg = swRegistration || (await navigator.serviceWorker.ready);
-        if (!reg) return;
-
-        // VAPID Public Key al
-        const keyRes = await fetch('/api/push/vapid-public-key');
-        const keyData = await keyRes.json();
-        if (!keyData.publicKey) {
-          if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ VAPID anahtarı alınamadı.</span>';
-          return;
-        }
-
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          if (Notification.permission === 'granted') {
-            sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
-            });
-          }
-        }
-
-        let targetShuttleId = activeShuttle ? activeShuttle.id : null;
-        if (!targetShuttleId) {
-          const savedSession = localStorage.getItem('servis360_driver_session');
-          if (savedSession) {
-            try {
-              const parsed = JSON.parse(savedSession);
-              if (parsed && parsed.shuttle) targetShuttleId = parsed.shuttle.id;
-            } catch (e) {}
-          }
-        }
-
-        if (sub && targetShuttleId) {
-          await fetch('/api/push/subscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              shuttleId: targetShuttleId,
-              subscription: sub.toJSON()
-            })
-          });
-          if (statusEl) {
-            statusEl.innerHTML = '<span style="color:#34d399">🟢 <b>Kilitli Ekran Web Push Aktif:</b> Telefon ekranınız kapalı olsa bile sefer saati geldiğinde telefonunuz titreyecektir.</span>';
-          }
-        } else if (Notification.permission !== 'granted') {
-          if (statusEl) {
-            statusEl.innerHTML = '<span style="color:#fbbf24">🟡 Kilitli Ekran Bildirimi için tarayıcı bildirim izni vermeniz gereklidir.</span>';
-          }
-        }
-      } catch (err) {
-        console.warn('Web push subscribe error:', err);
-        if (statusEl) {
-          statusEl.innerHTML = `<span style="color:#f59e0b">⚠️ Web Push: ${err.message}</span>`;
-        }
-      }
-    }
-
-    // Telefonu Kilitleyip Test Etmek İçin 5sn Gecikmeli Web Push Testi
-    async function testLockedScreenPush() {
-      if (!activeShuttle) {
-        alert('Lütfen önce şoför girişi yapın.');
-        return;
-      }
-
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        const perm = await Notification.requestPermission();
-        updateNotificationUiStatus();
-        if (perm !== 'granted') {
-          alert('Bildirim izni vermeden kilitli ekrana bildirim gönderilemez. Lütfen tarayıcı ayarlarından bildirim iznini açın.');
-          return;
-        }
-      }
-
-      const statusEl = document.getElementById('pushSubscriptionStatus');
-      if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8">⏳ Kilitli ekran aboneliği yenileniyor ve test bildirimi kuruluyor...</span>';
-
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
       try {
         const reg = swRegistration || (await navigator.serviceWorker.ready);
         const keyRes = await fetch('/api/push/vapid-public-key');
         const keyData = await keyRes.json();
-        
+        if (!keyData.publicKey) return;
+
         let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
+        if (!sub && Notification.permission === 'granted') {
           sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
           });
         }
 
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            shuttleId: activeShuttle.id,
-            subscription: sub.toJSON()
-          })
-        });
-
-        const res = await fetch('/api/push/test', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shuttleId: activeShuttle.id, delaySeconds: 5 })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Test başarısız');
-
-        if (statusEl) {
-          statusEl.innerHTML = '<span style="color:#34d399">⏱️ 5 SANİYE SAYACI BAŞLADI: Telefonu hemen kilitleyin!</span>';
+        if (sub && activeShuttle && activeShuttle.id) {
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shuttleId: activeShuttle.id,
+              subscription: sub.toJSON()
+            })
+          });
         }
-
-        alert('🔒 TEST BAŞLATILDI!\n\n1. Şimdi hemen telefonunuzun GÜÇ / KİLİT TUŞUNA BASARAK EKRANI KAPATIN.\n2. 5 saniye sonra sunucudan telefonunuza yüksek öncelikli Web Push bildirimi gelecek ve telefon titreyecek.\n3. Gelen bildirime dokunduğunuzda canlı sefer kokpiti otomatik açılacaktır.');
+        updatePermUi();
       } catch (err) {
-        alert('Push Test Hatası: ' + err.message);
-        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">❌ Test Hatası: ${err.message}</span>`;
+        console.warn('Web push subscribe error:', err);
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      // Service Worker Kaydı (Mobil Bildirimler ve PWA Eylemleri)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          .then((reg) => {
-            swRegistration = reg;
-            console.log('✅ ServiceWorker hazır, scope:', reg.scope);
-            updateNotificationUiStatus();
-            subscribeToWebPush();
-          })
-          .catch((err) => {
-            console.warn('ServiceWorker kayıt hatası:', err);
-            updateNotificationUiStatus();
-          });
+    function updatePermUi() {
+      const gpsEl = document.getElementById('permStatusGps');
+      const pushEl = document.getElementById('permStatusPush');
+      const wakeEl = document.getElementById('permStatusWakeLock');
 
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data && event.data.type === 'STOP_TRACKING_FROM_NOTIFICATION') {
-            console.log('🛑 Bildirim üzerinden canlı konum durdurma emri alındı.');
-            if (isTracking) {
-              stopTracking();
-            }
-          } else if (event.data && event.data.type === 'NOTIFICATION_CLICKED_AUTO_START') {
-            console.log('🚀 Bildirim tıklandı, canlı sefer başlatılıyor.');
-            if (!isTracking) {
-              triggerAutoStartTrip(currentTripType || 'morning');
-            }
-          }
-        });
-      }
-
-      updateNotificationUiStatus();
-
-      // Oturum kontrolü
-      const savedSession = localStorage.getItem('servis360_driver_session');
-      if (savedSession) {
-        try {
-          const session = JSON.parse(savedSession);
-          setupDriverDashboard(session.shuttle, session.passengers);
-        } catch (e) {
-          showLoginScreen();
+      if (gpsEl) {
+        if (localStorage.getItem('servis360_gps_approved') === '1') {
+          gpsEl.innerText = '🟢 İzin Verildi';
+          gpsEl.className = 'perm-chip-status ok';
+        } else {
+          gpsEl.innerText = '🔴 İzin Bekliyor';
+          gpsEl.className = 'perm-chip-status err';
         }
-      } else {
-        showLoginScreen();
       }
-    });
 
-    function showLoginScreen() {
-      document.getElementById('cardDriverLogin').style.display = 'block';
-      document.getElementById('sectionDriverCockpit').style.display = 'none';
-      document.getElementById('btnDriverLogout').style.display = 'none';
-      document.getElementById('txtHeaderRole').innerText = 'Şoför Girişi';
+      if (pushEl) {
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            pushEl.innerText = '🟢 İzin Verildi';
+            pushEl.className = 'perm-chip-status ok';
+          } else if (Notification.permission === 'denied') {
+            pushEl.innerText = '🔴 Engellendi (Site Ayarları)';
+            pushEl.className = 'perm-chip-status err';
+          } else {
+            pushEl.innerText = '🟡 İzin Bekliyor';
+            pushEl.className = 'perm-chip-status warn';
+          }
+        } else {
+          pushEl.innerText = '🚫 Desteklenmiyor';
+        }
+      }
+
+      if (wakeEl) {
+        if (screenWakeLock) {
+          wakeEl.innerText = '🟢 Aktif (Ekran Kapanmaz)';
+          wakeEl.className = 'perm-chip-status ok';
+        } else {
+          wakeEl.innerText = '⚪ Beklemede';
+          wakeEl.className = 'perm-chip-status';
+        }
+      }
+    }
+
+    // Tek Tıkla Tüm İzinleri Al
+    async function grantAllPermissionsOnce() {
+      // 1. Konum İzni İste
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            localStorage.setItem('servis360_gps_approved', '1');
+            updatePermUi();
+          },
+          (err) => {
+            alert('Konum izni alınamadı: ' + err.message);
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      }
+
+      // 2. Bildirim İzni İste
+      if ('Notification' in window) {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            await subscribeToWebPush();
+          }
+          updatePermUi();
+        } catch (e) {}
+      }
+
+      // 3. Wake Lock İste
+      await acquireWakeLock();
+
+      // 4. Onayı Aç
+      document.getElementById('chkAutoApproval').checked = true;
+      handleApprovalToggle(true);
+
+      alert('✅ HARİKA! Tüm izinler verildi ve otomatik konum paylaşımı onaylandı.\n\nTelefonunuz açıkken sefer saati geldiğinde konum kendiliğinden haritaya akmaya başlayacaktır.');
+    }
+
+    function handleApprovalToggle(checked) {
+      isAutoApproved = checked;
+      localStorage.setItem('servis360_auto_share_approved', checked ? '1' : '0');
+
+      const box = document.getElementById('boxApprovalCard');
+      const icon = document.getElementById('iconApprovalState');
+      const desc = document.getElementById('txtApprovalDesc');
+
+      if (checked) {
+        box.classList.add('approved');
+        icon.innerText = '✅';
+        desc.innerHTML = '<b>ONAYLANDI:</b> Araç sefer saati (Sabah: ' + (activeShuttle ? activeShuttle.shift_start_time : '07:15') + ' veya Akşam: ' + (activeShuttle ? activeShuttle.return_time : '11:45') + ') geldiğinde konum <b>kendiliğinden</b> başlayacak.';
+        acquireWakeLock();
+        checkShiftTimeAndTriggerAuto();
+      } else {
+        box.classList.remove('approved');
+        icon.innerText = '⚙️';
+        desc.innerText = 'Kapalı olduğunda sefer saatinde otomatik konum gönderilmez.';
+        releaseWakeLock();
+      }
+      updateUiState();
+    }
+
+    // 1 Saniyelik Saat Döngüsü: Sefer Saatini Takip Et
+    function startClockMonitor() {
+      if (clockInterval) clearInterval(clockInterval);
+
+      const updateClock = () => {
+        const timeWithSec = getTurkeyTimeStr(true);
+        const clockEl = document.getElementById('txtCurrentClock');
+        if (clockEl) clockEl.innerText = timeWithSec;
+
+        checkShiftTimeAndTriggerAuto();
+      };
+
+      updateClock();
+      clockInterval = setInterval(updateClock, 1000);
+
+      // Ekran açıldığında / sekme öne geldiğinde hemen kontrol et
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          console.log('📱 Ekran açıldı, sefer saati derhal kontrol ediliyor...');
+          if (isAutoApproved) acquireWakeLock();
+          checkShiftTimeAndTriggerAuto();
+        }
+      });
+      window.addEventListener('focus', checkShiftTimeAndTriggerAuto);
+    }
+
+    // Sefer Saati Kontrolü ve Otomatik Başlatma
+    function checkShiftTimeAndTriggerAuto() {
+      if (!activeShuttle || !isAutoApproved || isTracking) return;
+
+      const currentTimeStr = getTurkeyTimeStr(false); // "11:45"
+      const curMin = timeStrToMinutes(currentTimeStr);
+      if (curMin === null) return;
+
+      const mornMin = timeStrToMinutes(activeShuttle.shift_start_time);
+      const eveMin = timeStrToMinutes(activeShuttle.return_time);
+
+      let matchedMode = null;
+      // Tolerans penceresi: Tam o dakika veya sonraki 4 dakika
+      if (mornMin !== null && curMin >= mornMin && curMin <= mornMin + 4) {
+        matchedMode = 'morning';
+      } else if (eveMin !== null && curMin >= eveMin && curMin <= eveMin + 4) {
+        matchedMode = 'evening';
+      }
+
+      if (matchedMode) {
+        console.log(`⏰ Sefer saati geldi (${currentTimeStr} - ${matchedMode})! Canlı konum otomatik başlatılıyor.`);
+        startLiveTracking(matchedMode, true);
+      } else {
+        updateCountdownText(curMin, mornMin, eveMin);
+      }
+    }
+
+    function updateCountdownText(curMin, mornMin, eveMin) {
+      const titleEl = document.getElementById('txtWaitingTitle');
+      const subEl = document.getElementById('txtCountdownSub');
+      if (!titleEl || !subEl) return;
+
+      if (!isAutoApproved) {
+        titleEl.innerText = '⚙️ ONAY BEKLENİYOR';
+        subEl.innerText = 'Otomatik konum paylaşımı için yukarıdaki onay anahtarını açın.';
+        return;
+      }
+
+      let nextMin = null;
+      let nextLabel = '';
+      if (eveMin !== null && curMin < eveMin) {
+        nextMin = eveMin;
+        nextLabel = `Akşam Dönüş (${activeShuttle.return_time})`;
+      } else if (mornMin !== null && curMin < mornMin) {
+        nextMin = mornMin;
+        nextLabel = `Sabah Seferi (${activeShuttle.shift_start_time})`;
+      }
+
+      if (nextMin !== null) {
+        const diff = nextMin - curMin;
+        titleEl.innerText = `⏳ NÖBETTE: ${nextLabel} Bekleniyor`;
+        subEl.innerText = `Onayınız aktif. Sefer saatine ${diff} dakika kaldı. Saat geldiğinde konum kendiliğinden başlayacak.`;
+      } else {
+        titleEl.innerText = '⏳ NÖBETTE: Sefer Saati Bekleniyor';
+        subEl.innerText = `Planlanan: Sabah ${activeShuttle.shift_start_time || '07:15'} • Akşam ${activeShuttle.return_time || '11:45'}`;
+      }
+    }
+
+    // Canlı Konum Yayını Başlatma
+    function startLiveTracking(mode = 'evening', isAuto = false) {
+      if (isTracking) return;
+      isTracking = true;
+      packetCount = 0;
+      acquireWakeLock();
+
+      playAlertSound();
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 500]);
+
+      updateUiState();
+
+      // GPS Yayını
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+            const heading = pos.coords.heading || 0;
+            const accuracy = Math.round(pos.coords.accuracy) || 8;
+            await sendLocationToServer(lat, lng, speed, heading, accuracy, mode);
+          },
+          (err) => {
+            console.warn('GPS okuma hatası:', err.message);
+          },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+        );
+
+        // Düzenli aralıkla da gönder (WatchPosition duraksarsa)
+        gpsInterval = setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+              await sendLocationToServer(lat, lng, speed, pos.coords.heading || 0, Math.round(pos.coords.accuracy) || 8, mode);
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 5000 }
+          );
+        }, 3000);
+      }
+    }
+
+    async function sendLocationToServer(lat, lng, speed, heading, accuracy, mode) {
+      if (!activeShuttle) return;
+      packetCount++;
+      lastSentCoord = { lat, lng, speed };
+
+      const timeStr = getTurkeyTimeStr(true);
+      document.getElementById('txtLiveCoords').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      document.getElementById('txtLiveSpeed').innerText = `${speed} km/h`;
+      document.getElementById('txtPacketCount').innerText = packetCount;
+      document.getElementById('txtLastSentTime').innerText = timeStr;
+
+      try {
+        await fetch(`/api/shuttle/${activeShuttle.id}/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat,
+            lng,
+            speed,
+            heading,
+            accuracy,
+            status: 'running',
+            trip_type: mode
+          })
+        });
+      } catch (e) {
+        console.warn('Sunucuya konum iletilemedi:', e);
+      }
+    }
+
+    function stopLiveTracking() {
+      isTracking = false;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (gpsInterval) {
+        clearInterval(gpsInterval);
+        gpsInterval = null;
+      }
+      releaseWakeLock();
+      updateUiState();
+
+      if (activeShuttle) {
+        fetch(`/api/shuttle/${activeShuttle.id}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'idle' })
+        }).catch(() => {});
+      }
+    }
+
+    function manualStartTracking() {
+      startLiveTracking('evening', false);
+    }
+
+    function manualStopTracking() {
+      stopLiveTracking();
+    }
+
+    function updateUiState() {
+      const pill = document.getElementById('badgeGpsStatus');
+      const pillText = document.getElementById('txtGpsStatus');
+      const boxWait = document.getElementById('boxWaitingStatus');
+      const boxLive = document.getElementById('boxLiveBroadcasting');
+
+      if (isTracking) {
+        pill.className = 'status-pill active';
+        pillText.innerText = 'CANLI YAYINDA';
+        if (boxWait) boxWait.style.display = 'none';
+        if (boxLive) boxLive.style.display = 'block';
+      } else if (isAutoApproved) {
+        pill.className = 'status-pill waiting';
+        pillText.innerText = 'NÖBETTE';
+        if (boxWait) boxWait.style.display = 'block';
+        if (boxLive) boxLive.style.display = 'none';
+      } else {
+        pill.className = 'status-pill idle';
+        pillText.innerText = 'BEKLEMEDE';
+        if (boxWait) boxWait.style.display = 'block';
+        if (boxLive) boxLive.style.display = 'none';
+      }
+    }
+
+    function playAlertSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.45);
+      } catch (e) {}
+    }
+
+    // Sunucudan Saatleri Senkronize Et
+    async function syncShuttleDetailsFromServer(showAlert = false) {
+      if (!activeShuttle) return;
+      try {
+        const res = await fetch(`/api/shuttle/${activeShuttle.id}/sync`);
+        const data = await res.json();
+        if (data.success && data.shuttle) {
+          activeShuttle = { ...activeShuttle, ...data.shuttle };
+          document.getElementById('txtShiftStart').innerText = activeShuttle.shift_start_time || '07:15';
+          document.getElementById('txtShiftReturn').innerText = activeShuttle.return_time || '11:45';
+
+          // Oturum hafızasını tazele
+          localStorage.setItem('servis360_driver_session', JSON.stringify({ shuttle: activeShuttle }));
+
+          if (showAlert) {
+            alert(`✅ Saatler Güncellendi!\n\nSabah: ${activeShuttle.shift_start_time}\nAkşam Dönüş: ${activeShuttle.return_time}`);
+          }
+          checkShiftTimeAndTriggerAuto();
+        }
+      } catch (e) {
+        console.warn('Sync hatası:', e);
+      }
+    }
+
+    // Kokpiti Kur
+    function setupDriverDashboard(shuttle) {
+      activeShuttle = shuttle;
+
+      document.getElementById('cardDriverLogin').style.display = 'none';
+      document.getElementById('sectionDriverCockpit').style.display = 'flex';
+      document.getElementById('btnDriverLogout').style.display = 'block';
+
+      document.getElementById('txtPlate').innerText = shuttle.plate;
+      document.getElementById('txtDriverAndCompany').innerText = `${shuttle.driver_name || 'Şoför'} • ${shuttle.company_name || 'Firma'}`;
+      document.getElementById('txtShiftStart').innerText = shuttle.shift_start_time || '07:15';
+      document.getElementById('txtShiftReturn').innerText = shuttle.return_time || '11:45';
+
+      // Hafızadaki onayı kontrol et
+      const savedApproval = localStorage.getItem('servis360_auto_share_approved');
+      if (savedApproval === '1') {
+        document.getElementById('chkAutoApproval').checked = true;
+        handleApprovalToggle(true);
+      } else {
+        document.getElementById('chkAutoApproval').checked = false;
+        handleApprovalToggle(false);
+      }
+
+      startClockMonitor();
+      updatePermUi();
+      subscribeToWebPush();
+
+      // Düzenli aralıklarla sunucudan saatleri güncelle (15 saniyede bir)
+      setInterval(() => {
+        syncShuttleDetailsFromServer(false);
+      }, 15000);
+    }
+
+    function quickLogin(user, pass) {
+      document.getElementById('loginInputUsername').value = user;
+      document.getElementById('loginInputPassword').value = pass;
+      document.getElementById('btnLoginSubmit').click();
     }
 
     async function handleDriverLoginSubmit(e) {
@@ -1531,1122 +1108,49 @@
         if (!res.ok) throw new Error(data.error || 'Giriş yapılamadı');
 
         localStorage.setItem('servis360_driver_session', JSON.stringify({
-          shuttle: data.shuttle,
-          passengers: data.passengers
+          shuttle: data.shuttle
         }));
 
-        setupDriverDashboard(data.shuttle, data.passengers);
+        setupDriverDashboard(data.shuttle);
       } catch (err) {
         alert('Giriş Hatası: ' + err.message);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>Giriş Yap ve Kokpiti Aç</span><span>➔</span>';
+        btn.innerHTML = '<span>Giriş Yap ve Ayarları Aç</span><span>➔</span>';
       }
-    }
-
-    function quickLogin(user, pass) {
-      document.getElementById('loginInputUsername').value = user;
-      document.getElementById('loginInputPassword').value = pass;
-      document.getElementById('btnLoginSubmit').click();
     }
 
     function handleDriverLogout() {
-      if (isTracking) stopTracking();
-      if (simInterval) clearInterval(simInterval);
+      stopLiveTracking();
       localStorage.removeItem('servis360_driver_session');
       activeShuttle = null;
-      assignedPassengers = [];
-      showLoginScreen();
+      location.reload();
     }
 
-    async function setupDriverDashboard(shuttle, passengers) {
-      activeShuttle = shuttle;
-      assignedPassengers = passengers || [];
-
-      document.getElementById('cardDriverLogin').style.display = 'none';
-      document.getElementById('sectionDriverCockpit').style.display = 'flex';
-      document.getElementById('btnDriverLogout').style.display = 'block';
-      document.getElementById('txtHeaderRole').innerText = `${shuttle.plate} Kokpiti`;
-
-      document.getElementById('txtActivePlate').innerText = shuttle.plate;
-      document.getElementById('txtActiveCompany').innerText = shuttle.company_name;
-      document.getElementById('txtActiveDriver').innerText = shuttle.driver_name || 'Şoför';
-      document.getElementById('txtShiftStart').innerText = shuttle.shift_start_time || '07:15';
-      document.getElementById('txtShiftReturn').innerText = shuttle.return_time || '16:45';
-      document.getElementById('btnSimMornTime').innerText = shuttle.shift_start_time || '07:15';
-      document.getElementById('btnSimRetTime').innerText = shuttle.return_time || '16:45';
-      document.getElementById('txtHintMorning').innerText = shuttle.shift_start_time || '07:15';
-      document.getElementById('txtHintReturn').innerText = shuttle.return_time || '16:45';
-
-      const isSchool = shuttle.operation_type === 'school';
-      document.getElementById('txtOpTypeBadge').innerText = isSchool ? '🎓 Öğrenci Servisi' : '🏢 Personel Servisi';
-
-      // Sunucudan en güncel rota, duraklar ve saatleri senkronize et
-      await syncShuttleDetailsFromServer();
-
-      // Varsayılan olarak saate göre otomatik sabah veya akşam modunu seç
-      const now = new Date();
-      const curHour = now.getHours();
-      // Saat 12:00'den sonraysa otomatik akşam dönüş moduna hazırla
-      if (curHour >= 12) {
-        switchTripMode('evening');
-      } else {
-        switchTripMode('morning');
+    document.addEventListener('DOMContentLoaded', () => {
+      // Service Worker Kaydı
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            swRegistration = reg;
+            subscribeToWebPush();
+          })
+          .catch((err) => console.warn('SW kayıt hatası:', err));
       }
 
-      initDriverMap();
-      checkAndEnforceLocationPermission();
-      startAutoShiftClockCheck();
-      updateNotificationUiStatus();
-
-      // Kilitli ekran Web Push bildirim kaydını sunucuyla eşle
-      subscribeToWebPush();
-
-      // CANLI KONUM KONTROLÜ: Eğer araç veritabanında "running" (yayında) durumundaysa, kokpitte takibi derhal başlat ve canlı bannerı aç!
-      if (activeShuttle && activeShuttle.current_status === 'running' && !isTracking) {
-        console.log('🟢 Servis veritabanında aktif (running) kayıtlı, kokpitte canlı GPS akışı sürdürülüyor...');
-        startTracking(false, true); // isAutoResume = true
-      }
-
-      // Bildirimden veya URL parametresinden ?autostart=1 geldiyse seferi otomatik başlat!
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('autostart') === '1' && !isTracking) {
-        console.log('🚀 URL üzerinden autostart=1 algılandı, canlı sefer başlatılıyor...');
-        setTimeout(() => {
-          triggerAutoStartTrip(currentTripType || 'morning');
-        }, 600);
-      }
-    }
-
-    // Sunucudan en güncel servis, rota ve durak verilerini çek
-    async function syncShuttleDetailsFromServer() {
-      if (!activeShuttle) return;
-      try {
-        const res = await fetch(`/api/shuttle/${activeShuttle.id}/sync`);
-        const data = await res.json();
-        if (data.success) {
-          activeShuttle = { ...activeShuttle, ...data.shuttle };
-          if (data.passengers) assignedPassengers = data.passengers;
-          if (data.route) activeRoute = data.route;
-
-          // Durakları ata
-          if (data.stops && Array.isArray(data.stops) && data.stops.length > 0) {
-            activeRouteStops = [...data.stops].sort((a,b) => (a.stop_order || 0) - (b.stop_order || 0));
-          } else if (assignedPassengers && assignedPassengers.length > 0) {
-            const stopMap = new Map();
-            assignedPassengers.forEach(p => {
-              const sName = p.stop_name || 'Durak';
-              if (!stopMap.has(sName)) {
-                stopMap.set(sName, {
-                  id: p.stop_id || Math.floor(Math.random() * 10000),
-                  stop_name: sName,
-                  stop_order: p.stop_order || 1,
-                  lat: p.lat,
-                  lng: p.lng
-                });
-              }
-            });
-            activeRouteStops = Array.from(stopMap.values()).sort((a,b) => (a.stop_order || 0) - (b.stop_order || 0));
-          }
-
-          // İlk ve son durağı tespit et
-          if (activeRouteStops.length > 0) {
-            firstStop = activeRouteStops[0];
-            lastStop = activeRouteStops[activeRouteStops.length - 1];
-          } else if (assignedPassengers && assignedPassengers.length > 0) {
-            const sortedByOrder = [...assignedPassengers].sort((a,b) => (a.stop_order || 99) - (b.stop_order || 99));
-            firstStop = { name: sortedByOrder[0].stop_name || '1. Durak', order: 1 };
-            lastStop = { name: sortedByOrder[sortedByOrder.length - 1].stop_name || 'Son Durak', order: sortedByOrder.length };
-          }
-
-          // UI saatlerini tazele
-          document.getElementById('txtShiftStart').innerText = activeShuttle.shift_start_time || '07:15';
-          document.getElementById('txtShiftReturn').innerText = activeShuttle.return_time || '16:45';
-          document.getElementById('btnSimMornTime').innerText = activeShuttle.shift_start_time || '07:15';
-          document.getElementById('btnSimRetTime').innerText = activeShuttle.return_time || '16:45';
-          document.getElementById('txtHintMorning').innerText = activeShuttle.shift_start_time || '07:15';
-          document.getElementById('txtHintReturn').innerText = activeShuttle.return_time || '16:45';
-        }
-      } catch (e) {
-        console.warn('Senkronizasyon hatası:', e);
-      }
-    }
-
-    // Sefer İstikameti Değiştirici (Sabah Toplama vs Akşam Dağıtım)
-    function switchTripMode(mode) {
-      currentTripType = mode;
-      passedStopIds.clear(); // Yeni sefere geçildiğinde geçilen durakları sıfırla
-
-      const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
-      const btnMorn = document.getElementById('btnTripMorning');
-      const btnEve = document.getElementById('btnTripEvening');
-
-      if (mode === 'evening') {
-        btnEve.style.background = 'var(--accent-blue)';
-        btnEve.style.color = '#fff';
-        btnMorn.style.background = 'transparent';
-        btnMorn.style.color = 'var(--text-muted)';
-
-        document.getElementById('txtTripDirectionTitle').innerText = 'Akşam Seferi: Fabrikadan Evlere (Dönüş & Dağıtım)';
-        document.getElementById('txtTripDirectionDesc').innerText = 'Araç fabrikadan hareket eder, personelleri/öğrencileri sırayla evlerine bırakır ve son durakta tur biter.';
-        
-        document.getElementById('lblTargetTitle').innerText = 'Hedef (Son Bırakma Durağı)';
-        const lastStopName = lastStop ? lastStop.stop_name : (firstStop ? firstStop.name : 'Son Durak');
-        document.getElementById('txtWorkplaceName').innerText = `${lastStopName} (Tur Sonu)`;
-        document.getElementById('txtGeofenceRadius').innerText = '250m Radar';
-
-        document.getElementById('titlePassengerList').innerText = isSchool ? '🎓 Öğrenci İndirme & Dağıtım Listesi' : '👥 Personel İndirme & Dağıtım Listesi';
-        document.getElementById('subtitlePassengerList').innerText = 'İnen yolcuları [✓ İndi / Teslim Edildi] olarak işaretleyin.';
-      } else {
-        btnMorn.style.background = 'var(--accent-blue)';
-        btnMorn.style.color = '#fff';
-        btnEve.style.background = 'transparent';
-        btnEve.style.color = 'var(--text-muted)';
-
-        document.getElementById('txtTripDirectionTitle').innerText = 'Sabah Seferi: Duraklardan Fabrikaya (Toplama)';
-        document.getElementById('txtTripDirectionDesc').innerText = 'Personeller sabah duraklarından sırayla alınır ve fabrikaya ulaştırılır.';
-        
-        document.getElementById('lblTargetTitle').innerText = 'Hedef Varış Noktası';
-        document.getElementById('txtWorkplaceName').innerText = activeShuttle.workplace_name || (isSchool ? 'Merkez Okul Kampüsü' : 'Merkez Fabrika');
-        document.getElementById('txtGeofenceRadius').innerText = `${activeShuttle.geofence_radius_meters || 180}m Radar`;
-
-        document.getElementById('titlePassengerList').innerText = isSchool ? '🎓 Araca Atanan Öğrenciler' : '👥 Araca Atanan Personeller';
-        document.getElementById('subtitlePassengerList').innerText = 'Binen yolcuları [✓ Bindi] olarak işaretleyebilirsiniz.';
-      }
-
-      renderPassengerList();
-      updateMapDestinationCircle();
-      drawRouteOnDriverMap();
-    }
-
-    function renderPassengerList() {
-      const container = document.getElementById('containerPassengersList');
-      const countEl = document.getElementById('txtPassengerCount');
-
-      if (!assignedPassengers || assignedPassengers.length === 0) {
-        countEl.innerText = '0 Yolcu';
-        container.innerHTML = `
-          <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1.5rem 0;">
-            Bu araca henüz yolcu atanmamış.
-          </div>
-        `;
-        return;
-      }
-
-      const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
-      const isEvening = currentTripType === 'evening';
-
-      // AKŞAM DÖNÜŞÜNDE LİSTEYİ TERS ÇEVİR (Fabrikaya en yakın son duraktakiler önce iner, sabahki 1. durak en son iner!)
-      const displayList = isEvening ? [...assignedPassengers].reverse() : [...assignedPassengers];
-
-      // İstatistik
-      let completedCount = 0;
-      if (isEvening) {
-        completedCount = assignedPassengers.filter(p => p.status === 'dropped_off').length;
-        countEl.innerText = `${completedCount}/${assignedPassengers.length} İndi`;
-      } else {
-        completedCount = assignedPassengers.filter(p => p.status === 'boarded').length;
-        countEl.innerText = `${completedCount}/${assignedPassengers.length} Bindi`;
-      }
-
-      // Erken iniş bildirimi kontrolü: Eğer akşam modunda tüm yolcular indiyse turu bitirme uyarısı ver
-      const allDroppedBanner = (isEvening && completedCount === assignedPassengers.length && assignedPassengers.length > 0)
-        ? `
-          <div style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.35); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.75rem; text-align: center;">
-            <div style="font-size: 0.85rem; font-weight: 700; color: #34d399;">🎉 Tüm Yolcular İndirildi!</div>
-            <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 0.2rem;">
-              Erken iniş tamamlandı. Seferi sonlandırmak için "Seferi Bitir" butonuna basabilirsiniz.
-            </div>
-            <button type="button" class="btn-action-gps stop" onclick="handleFinishTripClick()" style="margin-top: 0.5rem; padding: 0.5rem; font-size: 0.8rem; justify-content: center;">
-              🏁 Seferi Hemen Bitir
-            </button>
-          </div>
-        `
-        : '';
-
-      const itemsHtml = displayList.map((p, idx) => {
-        const phone = isSchool ? (p.parent_phone || p.phone) : p.phone;
-        const subInfo = isSchool 
-          ? `Sınıf: ${p.student_class || '-'} • Veli: ${p.parent_name || '-'} (${p.parent_relation || 'Veli'})`
-          : `Departman: ${p.department || 'Genel'}`;
-
-        let btnClass = 'waiting';
-        let btnText = '⏳ Bekliyor';
-
-        if (isEvening) {
-          const isDropped = p.status === 'dropped_off';
-          btnClass = isDropped ? 'boarded' : 'waiting';
-          btnText = isDropped ? '✓ İndi / Teslim' : '🚌 Dağıtımda';
-        } else {
-          const isBoarded = p.status === 'boarded';
-          btnClass = isBoarded ? 'boarded' : 'waiting';
-          btnText = isBoarded ? '✓ Bindi' : '⏳ Bekliyor';
-        }
-
-        const dropOrderNum = isEvening ? `${idx + 1}. Bırakma` : `${p.stop_order || (idx + 1)}. Durak`;
-
-        return `
-          <div class="passenger-item">
-            <div style="flex: 1; padding-right: 0.5rem;">
-              <div style="display: flex; align-items: center; gap: 0.4rem;">
-                <span style="font-size: 0.7rem; background: rgba(255,255,255,0.08); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700; color: #94a3b8;">
-                  ${dropOrderNum}
-                </span>
-                <span style="font-size: 0.9rem; font-weight: 700; color: #fff;">${p.full_name}</span>
-              </div>
-              <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.2rem;">${subInfo}</div>
-              <div style="font-size: 0.725rem; color: var(--accent-cyan); margin-top: 0.2rem;">
-                📍 ${p.stop_name || 'Durak'}
-                ${phone ? ` • <a href="tel:${phone}" style="color:var(--accent-cyan); text-decoration:none;">📞 ${phone}</a>` : ''}
-              </div>
-            </div>
-            <div>
-              <button class="btn-board ${btnClass}" onclick="togglePassengerStatus(${p.id})">
-                ${btnText}
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      container.innerHTML = allDroppedBanner + itemsHtml;
-    }
-
-    async function togglePassengerStatus(passengerId) {
-      const p = assignedPassengers.find(x => x.id === passengerId);
-      if (!p) return;
-
-      if (currentTripType === 'evening') {
-        // Akşam modunda İndi / Dağıtımda arasında geçiş
-        p.status = p.status === 'dropped_off' ? 'boarded' : 'dropped_off';
-      } else {
-        // Sabah modunda Bindi / Bekliyor arasında geçiş
-        p.status = p.status === 'boarded' ? 'waiting' : 'boarded';
-      }
-
-      renderPassengerList();
-      playBeep(isTracking ? 750 : 550, 0.1);
-
-      try {
-        await fetch(`/api/shuttle/${activeShuttle.id}/passengers/${passengerId}/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: p.status })
-        });
-      } catch (err) {
-        console.warn('Yolcu durumu iletilemedi:', err);
-      }
-    }
-
-    // PWA Kurulum Olayı
-    let deferredInstallPrompt = null;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      const btn = document.getElementById('btnInstallPwa');
-      if (btn) btn.style.display = 'inline-flex';
-    });
-
-    async function handlePwaInstallClick() {
-      if (deferredInstallPrompt) {
-        deferredInstallPrompt.prompt();
-        const { outcome } = await deferredInstallPrompt.userChoice;
-        deferredInstallPrompt = null;
-      } else {
-        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIos) {
-          alert('📲 iPhone / iPad Kurulumu:\n\n1. Safari alt çubuğundaki "Paylaş" (kare içinden yukarı ok) simgesine dokunun.\n2. Açılan menüyü aşağı kaydırıp "Ana Ekrana Ekle" seçeneğine basın.\n\nServis360 Şoför uygulaması tam ekran olarak telefonunuza yüklenecektir.');
-        } else {
-          alert('📲 Android / Chrome Kurulumu:\n\n1. Tarayıcınızın sağ üstündeki 3 nokta (⋮) menüsüne dokunun.\n2. "Uygulamayı Yükle" veya "Ana Ekrana Ekle" seçeneğine basın.\n\nUygulama telefonunuza yüklenecektir.');
-        }
-      }
-    }
-
-    // Zorunlu Konum İzni Kontrolü & Yetkilendirme
-    function requestMandatoryLocationPermission() {
-      if (!navigator.geolocation) {
-        alert("Cihazınızda konum servisi bulunamadı.");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          localStorage.setItem('servis360_location_approved', '1');
-          document.getElementById('modalLocationRequired').style.display = 'none';
-          playSuccessChime();
-        },
-        (err) => {
-          console.warn("Konum izni verilmedi:", err);
-          document.getElementById('modalLocationRequired').style.display = 'flex';
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    }
-
-    function checkAndEnforceLocationPermission() {
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-
-      if (!navigator.geolocation) return;
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          localStorage.setItem('servis360_location_approved', '1');
-          document.getElementById('modalLocationRequired').style.display = 'none';
-        },
-        (err) => {
-          if (err.code === 1 || err.code === 2) {
-            document.getElementById('modalLocationRequired').style.display = 'flex';
-          }
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
-    }
-
-    let pendingAutoTripMode = 'evening';
-    function showGpsOffAlarmModal(mode) {
-      pendingAutoTripMode = mode;
-      document.getElementById('modalGpsOffAlarm').style.display = 'flex';
-      playAlarmSiren();
-      if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 600]);
-
-      sendMobileNotification(
-        "🚨 DİKKAT: Konumunuz Kapalı!",
-        "Sefer saati geldi ancak telefonunuzun GPS konumu kapalı! Canlı GPS yayınının başlayabilmesi için lütfen telefonunuzun bildirim çubuğunu indirip Konumu Açın.",
-        [
-          { action: 'continue', title: '📍 Konumu Açtım' },
-          { action: 'stop', title: '⏹️ Kapat' }
-        ],
-        "gps-off-alert"
-      );
-    }
-
-    function handleRetryGpsFromAlarm() {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          document.getElementById('modalGpsOffAlarm').style.display = 'none';
-          triggerSimulatedAutoStart(pendingAutoTripMode);
-        },
-        (err) => {
-          alert("Konum servisi hâlâ kapalı görünüyor. Lütfen telefonunuzun bildirim çubuğundan veya ayarlarından Konum (GPS)'u açıp tekrar deneyin.");
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    }
-
-    function playAlarmSiren() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.3);
-        osc.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 0.6);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.7);
-      } catch (e) {}
-    }
-
-    // Ekran Kapanmasını Önleyici Wake Lock API
-    let screenWakeLock = null;
-    async function acquireWakeLock() {
-      try {
-        if ('wakeLock' in navigator && !screenWakeLock) {
-          screenWakeLock = await navigator.wakeLock.request('screen');
-          console.log('💡 Screen Wake Lock aktif: Telefon ekranının kapanması engellendi.');
-          screenWakeLock.addEventListener('release', () => {
-            console.log('Screen Wake Lock serbest bırakıldı.');
-            screenWakeLock = null;
-          });
-        }
-      } catch (e) {
-        console.warn('Wake Lock hatası:', e.message);
-      }
-    }
-
-    function releaseWakeLock() {
-      if (screenWakeLock) {
-        screenWakeLock.release().catch(() => {});
-        screenWakeLock = null;
-      }
-    }
-
-    function timeStrToMinutes(timeStr) {
-      if (!timeStr || !timeStr.includes(':')) return null;
-      const parts = timeStr.trim().split(':').map(Number);
-      if (isNaN(parts[0]) || isNaN(parts[1])) return null;
-      return parts[0] * 60 + parts[1];
-    }
-
-    // Vardiya Saati Akıllı Kontrolü (Geniş zaman penceresi ve ekran uyanma algılayıcısı)
-    function startAutoShiftClockCheck() {
-      if (autoClockInterval) clearInterval(autoClockInterval);
-      
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-
-      const executeShiftCheck = async () => {
-        if (!activeShuttle) return;
-
-        // Her kontrol öncesi saatleri sunucuyla senkronize tut
-        await syncShuttleDetailsFromServer();
-
-        // Eğer araç zaten canlı yayındaysa tekrar başlatma
-        if (isTracking) return;
-
-        // Eğer veritabanında araç running statüsündeyse doğrudan kokpiti canlıya al
-        if (activeShuttle.current_status === 'running') {
-          startTracking(false, true);
-          return;
-        }
-
-        const now = new Date();
-        const nowMins = now.getHours() * 60 + now.getMinutes();
-
-        const morningStartMins = timeStrToMinutes(activeShuttle.shift_start_time || '07:15');
-        const returnMins = timeStrToMinutes(activeShuttle.return_time || '17:30');
-
-        // Bugün bu sefer modu daha önce tamamlandı mı kontrolü (günde 1 kere otomatik tetikleme)
-        const todayDateKey = now.toISOString().slice(0, 10);
-        const morningCompleted = sessionStorage.getItem(`servis360_completed_morning_${todayDateKey}`);
-        const eveningCompleted = sessionStorage.getItem(`servis360_completed_evening_${todayDateKey}`);
-
-        let targetMode = null;
-
-        // 1. AKŞAM SEFERİ PENCERESİ: (Dönüş saatine 10 dk kala başlar, 120 dk sonrasına kadar sürer)
-        if (returnMins && nowMins >= (returnMins - 10) && nowMins <= (returnMins + 120)) {
-          if (!eveningCompleted && activeShuttle.current_status !== 'completed_evening') {
-            targetMode = 'evening';
-          }
-        } 
-        // 2. SABAH TOPLAMA PENCERESİ: (Başlama saatine 5 dk kala başlar, 120 dk sonrasına kadar sürer)
-        // (Örn: 07:10 - 09:15 arası; kullanıcı telefonu 07:20'de açsa bile otomatik başlatır!)
-        else if (morningStartMins && nowMins >= (morningStartMins - 5) && nowMins <= (morningStartMins + 120)) {
-          if (!morningCompleted && activeShuttle.current_status !== 'completed') {
-            targetMode = 'morning';
-          }
-        }
-
-        if (targetMode) {
-          // GPS servisi açık mı kontrol et
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              // GPS açık, doğrudan yayını başlat
-              document.getElementById('modalGpsOffAlarm').style.display = 'none';
-              triggerAutoStartTrip(targetMode);
-            },
-            (err) => {
-              // GPS kapalı veya erişilemiyor, sesli alarm çal ve ekranda açma butonunu göster
-              showGpsOffAlarmModal(targetMode);
-            },
-            { enableHighAccuracy: true, timeout: 5000 }
-          );
-        }
-      };
-
-      // 1. Sayfa açıldığında derhal kontrol et
-      executeShiftCheck();
-
-      // 2. Her 10 saniyede bir periyodik kontrol et
-      autoClockInterval = setInterval(executeShiftCheck, 10000);
-
-      // 3. Telefon ekranı kilit açıldığında veya sekme öne geldiğinde UYKU MODUNDAN UYAN VE HEMEN KONTROL ET!
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          console.log('📱 Ekran açıldı / sekme ön plana geldi. Sefer saati tetikleniyor...');
-          executeShiftCheck();
-        }
-      });
-      window.addEventListener('focus', executeShiftCheck);
-    }
-
-    // Sefer Otomatik / Alarm ile Başlatma
-    function triggerAutoStartTrip(mode = 'morning') {
-      if (isTracking) stopTracking();
-
-      switchTripMode(mode);
-      playSuccessChime();
-      if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-
-      const timeStr = mode === 'evening' ? (activeShuttle.return_time || '17:30') : (activeShuttle.shift_start_time || '07:15');
-      const modeLabel = mode === 'evening' ? '🌇 AKŞAM DÖNÜŞ (DAĞITIM)' : '🌅 SABAH TOPLAMA';
-
-      sendMobileNotification(
-        `🔔 ${modeLabel} Saati Geldi!`,
-        `${activeShuttle.plate} için sefer saati (${timeStr}). Canlı GPS yayını otomatik başlatıldı.`,
-        [
-          { action: 'continue', title: '▶️ Devam Et' },
-          { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-        ],
-        "shift-time-alarm",
-        "⏰"
-      );
-
-      startTracking();
-      acquireWakeLock();
-    }
-    const triggerSimulatedAutoStart = triggerAutoStartTrip;
-
-    let driverRoutePolyline = null;
-    let driverStopMarkers = [];
-
-    // Rota Çizimi: Sabah Fabrikaya Doğru, Akşam Fabrikadan Evlere Doğru Çift Yönlü
-    function drawRouteOnDriverMap() {
-      if (!driverMap) return;
-
-      if (driverRoutePolyline) {
-        driverMap.removeLayer(driverRoutePolyline);
-        driverRoutePolyline = null;
-      }
-      driverStopMarkers.forEach(m => driverMap.removeLayer(m));
-      driverStopMarkers = [];
-
-      const isEvening = currentTripType === 'evening';
-
-      // Durakları ekle
-      if (activeRouteStops && activeRouteStops.length > 0) {
-        activeRouteStops.forEach((st, idx) => {
-          if (!st.lat || !st.lng) return;
-          const orderNum = isEvening ? `${activeRouteStops.length - idx}` : `${st.stop_order || (idx + 1)}`;
-          const pinColor = isEvening ? '#f59e0b' : '#3b82f6';
-          const pinBorder = isEvening ? '#fbbf24' : '#60a5fa';
-
-          const sIcon = L.divIcon({
-            className: 'custom-pin',
-            html: `<div style="background:#0f172a; border:2px solid ${pinBorder}; color:${pinColor}; width:24px; height:24px; border-radius:50%; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.6);">${orderNum}</div>`,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-          });
-          const m = L.marker([st.lat, st.lng], { icon: sIcon })
-            .bindPopup(`<b>${st.stop_name || 'Durak'}</b><br>Sıra: ${orderNum}<br>Planlanan Saat: ${st.eta_time || '-'}`)
-            .addTo(driverMap);
-          driverStopMarkers.push(m);
-        });
-      }
-
-      // Rota çizgisi (OSRM Yol Geometrisi)
-      if (activeRoute && activeRoute.road_geometry && Array.isArray(activeRoute.road_geometry) && activeRoute.road_geometry.length > 1) {
-        // Sabah: Duraklar -> Fabrika
-        // Akşam: Fabrika -> Duraklar (Ters Geometri)
-        const pts = isEvening 
-          ? [...activeRoute.road_geometry].reverse() 
-          : [...activeRoute.road_geometry];
-
-        driverRoutePolyline = L.polyline(pts, {
-          color: isEvening ? '#f59e0b' : '#3b82f6',
-          weight: 5,
-          opacity: 0.9,
-          dashArray: isEvening ? '12, 6' : null
-        }).addTo(driverMap);
-
-        driverMap.fitBounds(driverRoutePolyline.getBounds(), { padding: [25, 25] });
-      }
-    }
-
-    function initDriverMap() {
-      const container = document.getElementById('driverMap');
-      if (!container || !activeShuttle) return;
-
-      const targetLat = activeShuttle.workplace_lat || 40.72318;
-      const targetLng = activeShuttle.workplace_lng || 29.493785;
-
-      if (!driverMap) {
-        driverMap = L.map('driverMap', {
-          zoomControl: false,
-          attributionControl: false
-        }).setView([targetLat, targetLng], 14);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19
-        }).addTo(driverMap);
-      } else {
-        driverMap.invalidateSize();
-      }
-
-      // Eğer aracın son koordinatları varsa araç işaretçisini haritaya yerleştir!
-      if (activeShuttle.last_lat && activeShuttle.last_lng) {
-        const sLat = parseFloat(activeShuttle.last_lat);
-        const sLng = parseFloat(activeShuttle.last_lng);
-        if (!isNaN(sLat) && !isNaN(sLng)) {
-          if (!driverMarker) {
-            const shuttleIcon = L.divIcon({
-              className: 'custom-pin',
-              html: `<div style="font-size:26px; filter: drop-shadow(0 0 10px #3b82f6);">🚐</div>`,
-              iconSize: [32, 32],
-              iconAnchor: [16, 16]
-            });
-            driverMarker = L.marker([sLat, sLng], { icon: shuttleIcon }).addTo(driverMap);
-          } else {
-            driverMarker.setLatLng([sLat, sLng]);
-          }
-          driverMap.setView([sLat, sLng], 14);
-        }
-      }
-
-      updateMapDestinationCircle();
-      drawRouteOnDriverMap();
-    }
-
-    function updateMapDestinationCircle() {
-      if (!driverMap || !activeShuttle) return;
-      if (destinationCircle) driverMap.removeLayer(destinationCircle);
-
-      let targetLat = activeShuttle.workplace_lat || 40.72318;
-      let targetLng = activeShuttle.workplace_lng || 29.493785;
-      let radius = activeShuttle.geofence_radius_meters || 180;
-
-      // Akşam modunda hedef sabahki 1. durak koordinatı (varsa)
-      if (currentTripType === 'evening' && assignedPassengers.length > 0) {
-        const sorted = [...assignedPassengers].sort((a,b) => (a.stop_order || 99) - (b.stop_order || 99));
-        if (sorted[0].lat && sorted[0].lng) {
-          targetLat = sorted[0].lat;
-          targetLng = sorted[0].lng;
-          radius = 250;
-        }
-      }
-
-      destinationCircle = L.circle([targetLat, targetLng], {
-        radius: radius,
-        color: '#f43f5e',
-        fillColor: '#f43f5e',
-        fillOpacity: 0.2,
-        dashArray: '6, 6'
-      }).addTo(driverMap);
-    }
-
-    function toggleDriverGps() {
-      if (isTracking) {
-        stopTracking();
-      } else {
-        startTracking();
-      }
-    }
-
-    // Şoför Seferi Bitir Butonuna Bastığında (Kullanıcı Talebi: "şöfor seferi bitir deyince bitirmesi lazım")
-    async function handleFinishTripClick() {
-      const isEvening = currentTripType === 'evening';
-      const promptMsg = isEvening
-        ? "Akşam dönüş seferini tamamlayıp canlı yayını kapatmak istiyor musunuz?"
-        : "Sabah toplama seferini tamamlayıp canlı yayını kapatmak istiyor musunuz?";
-
-      if (!confirm(promptMsg)) return;
-
-      stopTracking();
-      if (simInterval) clearInterval(simInterval);
-
-      try {
-        await fetch(`/api/shuttle/${activeShuttle.id}/finish-trip`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trip_type: currentTripType })
-        });
-      } catch (e) {
-        console.warn('Sefer sonlandırma bildirimi iletilemedi:', e);
-      }
-
-      playArrivalFanfare();
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
-
-      // Hedefe varış & sefer tamamlama modalı
-      document.getElementById('txtArrivalTitle').innerText = '🏁 Sefer Başarıyla Tamamlandı!';
-      document.getElementById('txtArrivalMsg').innerText = isEvening
-        ? 'Akşam dönüş seferi başarıyla tamamlandı. Tüm yolcular güvenle indirildi, sabahki 1. durağa ulaşıldı ve tur bitirildi.'
-        : `${activeShuttle.workplace_name || 'Hedef'} varış noktasına ulaşıldı. Personeller iş yerine vardı ve sefer tamamlandı.`;
-
-      document.getElementById('modalArrival').style.display = 'flex';
-
-      // Status pill ve buton güncellemesi
-      const pill = document.getElementById('badgeGpsStatus');
-      const pillText = document.getElementById('txtGpsStatus');
-      pill.classList.remove('active');
-      pillText.innerText = 'SEFER TAMAMLANDI';
-      document.getElementById('btnFinishTrip').style.display = 'none';
-      document.getElementById('btnGpsText').innerText = '📡 YENİ SEFER BAŞLAT';
-    }
-
-    function startTracking(isSimulated = false, isAutoResume = false) {
-      if (!activeShuttle) return;
-
-      isTracking = true;
-      updateUiTrackingState(true);
-
-      // Sunucuya statüyü 'running' olarak ilet (Web sitesi ve sunucuyla anında senkron)
-      fetch(`/api/shuttle/${activeShuttle.id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'running' })
-      }).catch(e => console.warn('Statü güncelleme hatası:', e));
-
-      playBeep(880, 0.2);
-      if (navigator.vibrate) navigator.vibrate(100);
-
-      const isEvening = currentTripType === 'evening';
-      const companyName = activeShuttle.workplace_name || activeShuttle.company_name || 'Firmaya';
-      const lastStopTitle = lastStop ? lastStop.stop_name : (firstStop ? firstStop.name : 'Son Durak');
-
-      // Kullanıcı Talebi: Akşam "Canlı konum son durağa kadar başladı", Sabah "Canlı konum Firmaya kadar başladı"
-      const notifTitle = isEvening
-        ? 'Canlı konum son durağa kadar başladı'
-        : 'Canlı konum Firmaya kadar başladı';
-
-      const notifBody = isEvening
-        ? `${activeShuttle.plate} aracı için akşam dağıtım canlı GPS yayını başladı. Tüm yolcular son durağa (${lastStopTitle}) kadar anlık izliyor.`
-        : `${activeShuttle.plate} aracı için sabah işe gidiş canlı GPS yayını başladı. ${companyName} hedefine kadar tüm duraklar izleniyor.`;
-
-      // Bildirim üstünde Devam Et / Canlı Konumu Durdur butonları ile anlık bildirim gönder
-      if (!isAutoResume) {
-        sendMobileNotification(
-          notifTitle,
-          notifBody,
-          [
-            { action: 'continue', title: '▶️ Devam Et' },
-            { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-          ],
-          'servis360-trip-start',
-          '🟢'
-        );
-      } else {
-        showInAppNotification(
-          "🟢 Canlı GPS Yayını Aktif",
-          `${activeShuttle.plate} aracı için canlı konum yayını devam ediyor. Şirket ve yolcular anlık izliyor.`,
-          [
-            { action: 'continue', title: '▶️ Devam Et' },
-            { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-          ],
-          '🟢'
-        );
-      }
-
-      // Önceki simülasyonları kesinlikle temizle (Kullanıcı kendi gerçek GPS konumuyla takip edilir)
-      if (simInterval) {
-        clearInterval(simInterval);
-        simInterval = null;
-      }
-
-      if (isSimulated) {
-        startSimulatedGpsStream();
-        return;
-      }
-
-      if (!navigator.geolocation) {
-        alert('Cihazınızda GPS donanımı veya konum servisi bulunamadı.');
-        return;
-      }
-
-      const geoOptions = {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 3000
-      };
-
-      // 1. Telefonun o anki gerçek GPS konumunu HEMEN al (fabrika yanıysa doğrudan fabrikayı alsın!)
-      navigator.geolocation.getCurrentPosition(
-        handleGpsSuccess,
-        (err) => {
-          console.warn('İlk GPS okuma uyarısı:', err);
-          document.getElementById('metricAccuracy').innerHTML = '±-- <span style="font-size:0.75rem;">Uydu Aranıyor</span>';
-        },
-        geoOptions
-      );
-
-      // 2. Hareket ettikçe telefonun gerçek GPS koordinatlarını sürekli yayınla (ASLA simülasyona veya 1. durağa zıplamaz!)
-      watchId = navigator.geolocation.watchPosition(
-        handleGpsSuccess,
-        (err) => {
-          console.warn('GPS akış uyarısı:', err);
-        },
-        geoOptions
-      );
-    }
-
-    function stopTracking() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-      if (simInterval !== null) {
-        clearInterval(simInterval);
-        simInterval = null;
-      }
-
-      isTracking = false;
-      updateUiTrackingState(false);
-      playBeep(440, 0.2);
-
-      // Sunucuya statüyü 'idle' olarak ilet (Web sitesiyle anında senkron)
-      if (activeShuttle) {
-        fetch(`/api/shuttle/${activeShuttle.id}/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'idle' })
-        }).catch(e => console.warn('Statü idle güncelleme hatası:', e));
-      }
-
-      showInAppNotification(
-        "⏹️ Canlı Konum Durduruldu",
-        "Canlı GPS yayını kapatıldı. İstediğiniz zaman [📡 CANLI KONUMU BAŞLAT] butonu ile tekrar başlatabilirsiniz.",
-        [],
-        "⏹️"
-      );
-    }
-
-    // Durak Sanal Çit Kontrolleri ve Aşamalı Bildirimler
-    function checkStopGeofences(lat, lng) {
-      if (!activeRouteStops || activeRouteStops.length === 0) return;
-
-      const isEvening = currentTripType === 'evening';
-      // Sabah: 1..N sırasıyla (1. durak, 2. durak...)
-      // Akşam: N..1 ters sırasıyla (10. durak, 9. durak...)
-      const sequence = isEvening
-        ? [...activeRouteStops].sort((a,b) => (b.stop_order || 0) - (a.stop_order || 0))
-        : [...activeRouteStops].sort((a,b) => (a.stop_order || 0) - (b.stop_order || 0));
-
-      const thresholdMeters = Math.max(activeShuttle ? (activeShuttle.geofence_radius_meters || 180) : 180, 200);
-
-      for (let i = 0; i < sequence.length; i++) {
-        const stop = sequence[i];
-        if (!stop.lat || !stop.lng) continue;
-        if (passedStopIds.has(stop.id)) continue;
-
-        const dist = calcHaversineMeters(lat, lng, stop.lat, stop.lng);
-        if (dist <= thresholdMeters) {
-          passedStopIds.add(stop.id);
-          const nextStop = sequence[i + 1] || null;
-
-          let notifTitle = '';
-          let notifBody = '';
-
-          if (isEvening) {
-            // Kullanıcı Talebi: Akşam dönüşte "10.durağa geçtiniz 9.durağı geçtiniz tarzında bildirim gelsin geçtiniz/tamamladınız şeklinde"
-            notifTitle = `📍 ${stop.stop_order}. Durağı Geçtiniz (Tamamlandı)`;
-            notifBody = `${stop.stop_name} durağı tamamlandı (Yolcular indirildi).${nextStop ? ` Sıradaki: ${nextStop.stop_order}. Durak (${nextStop.stop_name})` : ' Tüm duraklar tamamlandı, son durağa ulaşıldı.'}`;
-          } else {
-            // Kullanıcı Talebi: Sabah gidişte "1.durağı geçince 1.durağı geçtiniz 2. durağı geçince 2.durağı geçtiniz"
-            notifTitle = `📍 ${stop.stop_order}. Durağı Geçtiniz`;
-            notifBody = `${stop.stop_name} durağı tamamlandı.${nextStop ? ` Sıradaki: ${nextStop.stop_order}. Durak (${nextStop.stop_name})` : ' Tüm duraklar bitti, firmaya gidiliyor.'}`;
-          }
-
-          // Ses ve titreşim uyarısı
-          playSuccessChime();
-          if (navigator.vibrate) navigator.vibrate([250, 100, 250]);
-
-          // Bildirim gönder (Devam et / Canlı konumu durdur butonlarıyla)
-          sendMobileNotification(
-            notifTitle,
-            notifBody,
-            [
-              { action: 'continue', title: '▶️ Devam Et' },
-              { action: 'stop', title: '⏹️ Canlı Konumu Durdur' }
-            ],
-            `stop-passed-${stop.id}`
-          );
-
-          // Bu duraktaki yolcuların durumunu otomatik güncelle
-          autoUpdatePassengersForStop(stop);
-
-          // Sefer günlüğü için sunucuya durak logu ilet
-          fetch(`/api/shuttle/${activeShuttle.id}/stop-passed`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              stop_id: stop.id,
-              stop_order: stop.stop_order,
-              stop_name: stop.stop_name,
-              planned_eta: stop.eta_time,
-              trip_type: currentTripType
-            })
-          }).catch(() => {});
-          break;
-        }
-      }
-    }
-
-    // Duraktan geçildiğinde personellerin/öğrencilerin durumunu güncelle (Sabah: Bindi, Akşam: İndi)
-    async function autoUpdatePassengersForStop(stop) {
-      if (!assignedPassengers || assignedPassengers.length === 0) return;
-
-      const isEvening = currentTripType === 'evening';
-      const newStatus = isEvening ? 'dropped_off' : 'boarded';
-
-      const affectedPassengers = assignedPassengers.filter(p => 
-        (p.stop_id && stop.id && p.stop_id === stop.id) ||
-        (p.stop_name && stop.stop_name && p.stop_name.trim().toLowerCase() === stop.stop_name.trim().toLowerCase())
-      );
-
-      if (affectedPassengers.length === 0) return;
-
-      for (const p of affectedPassengers) {
-        p.status = newStatus;
+      // Oturum Kontrolü
+      const savedSession = localStorage.getItem('servis360_driver_session');
+      if (savedSession) {
         try {
-          fetch(`/api/shuttle/${activeShuttle.id}/passengers/${p.id}/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
-          }).catch(() => {});
+          const session = JSON.parse(savedSession);
+          if (session && session.shuttle) {
+            setupDriverDashboard(session.shuttle);
+            return;
+          }
         } catch (e) {}
       }
-
-      renderPassengerList();
-    }
-
-    // Gerçek veya Simüle Edilen GPS Konumunu Sunucuya İlet
-    async function sendGpsLocation(lat, lng, speedKmH = 42, heading = 0, accuracy = 8) {
-      document.getElementById('metricSpeed').innerHTML = `${speedKmH} <span style="font-size:0.75rem;">km/s</span>`;
-      document.getElementById('metricAccuracy').innerHTML = `±${accuracy} <span style="font-size:0.75rem;">m</span>`;
-
-      if (driverMap) {
-        if (!driverMarker) {
-          const shuttleIcon = L.divIcon({
-            className: 'custom-pin',
-            html: `<div style="font-size:26px; filter: drop-shadow(0 0 10px #3b82f6);">🚐</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-          });
-          driverMarker = L.marker([lat, lng], { icon: shuttleIcon }).addTo(driverMap);
-        } else {
-          driverMarker.setLatLng([lat, lng]);
-        }
-
-        if (!accuracyCircle) {
-          accuracyCircle = L.circle([lat, lng], {
-            radius: accuracy,
-            color: '#3b82f6',
-            fillColor: '#3b82f6',
-            fillOpacity: 0.15,
-            weight: 1
-          }).addTo(driverMap);
-        } else {
-          accuracyCircle.setLatLng([lat, lng]);
-          accuracyCircle.setRadius(accuracy);
-        }
-
-        driverMap.panTo([lat, lng]);
-      }
-
-      // Her yeni GPS koordinatında durak çitlerini kontrol et ve aşamalı bildirim gönder
-      checkStopGeofences(lat, lng);
-
-      try {
-        const res = await fetch(`/api/shuttle/${activeShuttle.id}/location`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lat: lat,
-            lng: lng,
-            speed: speedKmH,
-            heading: heading,
-            status: 'running',
-            trip_type: currentTripType // 'evening' veya 'morning'
-          })
-        });
-
-        const data = await res.json();
-        // Dönüşte ilk durağa varıldı mı veya sabah fabrikaya varıldı mı?
-        if (data.arrived) {
-          triggerArrivalAutomation(data);
-        }
-      } catch (err) {
-        console.warn('GPS koordinatı gönderilemedi:', err);
-      }
-    }
-
-    async function handleGpsSuccess(pos) {
-      if (simInterval) {
-        clearInterval(simInterval);
-        simInterval = null;
-      }
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
-      const accuracy = Math.round(pos.coords.accuracy) || 8;
-      await sendGpsLocation(lat, lng, speedKmH, pos.coords.heading || 0, accuracy);
-    }
-
-    function triggerArrivalAutomation(data) {
-      stopTracking();
-      releaseWakeLock();
-      playArrivalFanfare();
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
-
-      const isEvening = data.trip_type === 'evening' || currentTripType === 'evening';
-      const isSchool = activeShuttle && activeShuttle.operation_type === 'school';
-      const todayDateKey = new Date().toISOString().slice(0, 10);
-      sessionStorage.setItem(`servis360_completed_${isEvening ? 'evening' : 'morning'}_${todayDateKey}`, '1');
-
-      if (isEvening) {
-        // Akşam dönüşünde sabahki 1. durağa varıldı!
-        document.getElementById('txtArrivalTitle').innerText = '🎯 Sabahki 1. Durağa Ulaşıldı!';
-        document.getElementById('txtArrivalMsg').innerText = `Akşam dağıtım seferi başarıyla tamamlandı. Son durağa (${data.reached_stop_name || '1. Durak'}) varıldı, araç park edildi ve tur bitirildi.`;
-      } else {
-        // Sabah toplamasında fabrikaya/okula varıldı!
-        document.getElementById('txtArrivalTitle').innerText = '🎯 Hedefe Ulaşıldı!';
-        document.getElementById('txtArrivalMsg').innerText = isSchool
-          ? `${data.workplace_name || 'Okul'} sanal çitine giriş yaptınız. Velilere "Öğrenci okula ulaştı" bildirimi iletildi ve canlı GPS yayını otomatik kapatıldı.`
-          : `${data.workplace_name || 'Fabrika'} sanal çitine giriş yaptınız. Personeller iş yerine vardı ve canlı GPS yayını otomatik kapatıldı.`;
-      }
-
-      document.getElementById('modalArrival').style.display = 'flex';
-
-      const pill = document.getElementById('badgeGpsStatus');
-      const pillText = document.getElementById('txtGpsStatus');
-      pill.classList.remove('active');
-      pillText.innerText = 'TUR TAMAMLANDI';
-      document.getElementById('btnFinishTrip').style.display = 'none';
-      document.getElementById('btnGpsText').innerText = '📡 YENİ SEFER BAŞLAT';
-    }
-
-    function closeArrivalModal() {
-      document.getElementById('modalArrival').style.display = 'none';
-    }
-
-    function updateUiTrackingState(active) {
-      const pill = document.getElementById('badgeGpsStatus');
-      const pillText = document.getElementById('txtGpsStatus');
-      const btn = document.getElementById('btnToggleGps');
-      const btnText = document.getElementById('btnGpsText');
-      const btnFinish = document.getElementById('btnFinishTrip');
-      const liveBanner = document.getElementById('bannerLiveBroadcastingActive');
-      const livePlate = document.getElementById('liveBannerPlate');
-      const liveSub = document.getElementById('liveBannerSub');
-
-      if (active) {
-        pill.classList.add('active');
-        pillText.innerText = 'CANLI YAYINDA';
-        btn.classList.remove('start');
-        btn.classList.add('stop');
-        btnText.innerText = '🛑 CANLI KONUMU DURDUR';
-        if (btnFinish) btnFinish.style.display = 'flex';
-
-        if (liveBanner) {
-          liveBanner.style.display = 'flex';
-          if (livePlate && activeShuttle) livePlate.innerText = activeShuttle.plate;
-          if (liveSub && activeShuttle) {
-            const isEvening = currentTripType === 'evening';
-            const lastStopTitle = lastStop ? lastStop.stop_name : (firstStop ? firstStop.name : 'Son Durak');
-            liveSub.innerText = isEvening 
-              ? `Akşam Dağıtımı: Son durağa (${lastStopTitle}) kadar canlı GPS koordinatlarınız yayınlanıyor.` 
-              : `Sabah Toplaması: ${activeShuttle.workplace_name || activeShuttle.company_name || 'Hedefe'} kadar canlı GPS koordinatlarınız yayınlanıyor.`;
-          }
-        }
-        startTripTimer();
-      } else {
-        pill.classList.remove('active');
-        pillText.innerText = 'BEKLEMEDE';
-        btn.classList.remove('stop');
-        btn.classList.add('start');
-        btnText.innerText = '📡 CANLI KONUMU BAŞLAT';
-        if (btnFinish) btnFinish.style.display = 'none';
-
-        if (liveBanner) liveBanner.style.display = 'none';
-        stopTripTimer();
-      }
-    }
+      document.getElementById('cardDriverLogin').style.display = 'block';
+    });
   </script>
 </body>
 </html>
