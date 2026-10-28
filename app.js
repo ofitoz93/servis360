@@ -2270,3 +2270,8 @@ window.exportTripsCsv = function() {
   document.body.removeChild(a);
   showToast("Rapor İndirildi", "Sefer kayıtları CSV / Excel formatında dışa aktarıldı.", "success");
 };
+
+// Şirket Paneli Açıkken Vercel Arka Plan Sefer Saati Tetikleyicisi (Her 20 saniyede bir kontrol)
+setInterval(() => {
+  fetch('/api/cron/check-shifts').catch(() => {});
+}, 20000);

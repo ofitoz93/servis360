@@ -1270,28 +1270,52 @@ app.post('/api/push/test', async (req, res) => {
   }
 });
 
-// 4. OTOMATİK SEFER SAATİ ARKA PLAN ZAMANLAYICISI (CRON SCHEDULER)
-// Sunucu sürekli çalışarak saati takip eder (07:15, 17:30 vb.). Saati gelen servise doğrudan push gönderir!
-setInterval(async () => {
+// 4. OTOMATİK SEFER SAATİ ARKA PLAN ZAMANLAYICISI & CRON ENDPOINT'I
+// Türkiye saati (Europe/Istanbul) kullanarak saatleri kontrol eder. Vercel ve local ortamlarda çalışır.
+async function runShiftCheckAndNotify() {
   try {
-    const now = new Date();
-    const currentH = now.getHours().toString().padStart(2, '0');
-    const currentM = now.getMinutes().toString().padStart(2, '0');
-    const currentTimeStr = `${currentH}:${currentM}`;
+    const formatter = new Intl.DateTimeFormat('tr-TR', {
+      timeZone: 'Europe/Istanbul',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const currentTimeStr = formatter.format(new Date());
 
-    // Başlama veya dönüş saati o anki dakikaya denk gelen servisleri bul
+    const [curH, curM] = currentTimeStr.split(':').map(Number);
+    const curMinutes = curH * 60 + curM;
+
     const shuttlesRes = await pool.query(`
       SELECT s.*, c.company_name, c.workplace_name
       FROM shuttles s
       JOIN companies c ON s.company_id = c.id
-      WHERE s.shift_start_time = $1 OR s.return_time = $1
-    `, [currentTimeStr]);
+    `);
+
+    let sentNotifications = [];
 
     for (const shuttle of shuttlesRes.rows) {
-      const isEvening = shuttle.return_time === currentTimeStr;
-      const tripLabel = isEvening ? 'Akşam Dönüş (Dağıtım)' : 'Sabah Toplama';
+      if (!shuttle.shift_start_time && !shuttle.return_time) continue;
 
-      // Bu araca ait kayıtlı push subscription'ları çek (son 10 dakikada bildirim atılmamış olanlar)
+      const mornMin = shuttle.shift_start_time ? (parseInt(shuttle.shift_start_time.split(':')[0]) * 60 + parseInt(shuttle.shift_start_time.split(':')[1])) : null;
+      const eveMin = shuttle.return_time ? (parseInt(shuttle.return_time.split(':')[0]) * 60 + parseInt(shuttle.return_time.split(':')[1])) : null;
+
+      let matchedMode = null;
+      // Saat toleransı: tam o dakika veya son 4 dakika içinde (örneğin 10:23 için 10:23 - 10:27 arası)
+      if (mornMin !== null && curMinutes >= mornMin && curMinutes <= mornMin + 4) {
+        matchedMode = 'morning';
+      } else if (eveMin !== null && curMinutes >= eveMin && curMinutes <= eveMin + 4) {
+        matchedMode = 'evening';
+      }
+
+      if (!matchedMode) continue;
+
+      // Eğer araç zaten canlı yayındaysa veya seferi tamamlamışsa bildirim atma
+      if (shuttle.current_status === 'running' || shuttle.current_status === 'arrived') continue;
+
+      const tripLabel = matchedMode === 'evening' ? 'Akşam Dönüş (Dağıtım)' : 'Sabah Toplama';
+      const scheduledTimeStr = matchedMode === 'evening' ? shuttle.return_time : shuttle.shift_start_time;
+
+      // Son 10 dakikada bildirim atılmamış cihazları bul
       const subsRes = await pool.query(`
         SELECT * FROM push_subscriptions 
         WHERE shuttle_id = $1 
@@ -1301,9 +1325,9 @@ setInterval(async () => {
       if (subsRes.rows.length > 0) {
         const payload = JSON.stringify({
           title: `⏰ ${shuttle.plate}: ${tripLabel} Saati Geldi!`,
-          body: `Saat ${currentTimeStr}. Canlı GPS yayını başlatmak için dokunun.`,
-          url: `/driver.html?autostart=1`,
-          trip_mode: isEvening ? 'evening' : 'morning'
+          body: `Planlanan saat: ${scheduledTimeStr}. Canlı GPS yayını başlatmak için dokunun.`,
+          url: `/driver.html?autostart=1&mode=${matchedMode}`,
+          trip_mode: matchedMode
         });
 
         for (const sub of subsRes.rows) {
@@ -1314,7 +1338,8 @@ setInterval(async () => {
             };
             await webpush.sendNotification(pushConfig, payload);
             await pool.query('UPDATE push_subscriptions SET last_notified_at = NOW() WHERE id = $1', [sub.id]);
-            console.log(`📡 [Web Push] ${shuttle.plate} için ${tripLabel} bildirimi telefon ekranı kapalıyken başarıyla gönderildi!`);
+            sentNotifications.push({ plate: shuttle.plate, mode: matchedMode, subId: sub.id });
+            console.log(`📡 [Web Push] ${shuttle.plate} (${tripLabel}) bildirimi başarıyla gönderildi!`);
           } catch (e) {
             console.warn(`Push gönderilemedi (${sub.id}):`, e.message);
             if (e.statusCode === 410 || e.statusCode === 404) {
@@ -1324,10 +1349,28 @@ setInterval(async () => {
         }
       }
     }
+
+    return {
+      success: true,
+      timeZone: 'Europe/Istanbul',
+      currentTime: currentTimeStr,
+      sentCount: sentNotifications.length,
+      notifications: sentNotifications
+    };
   } catch (err) {
-    // Sessiz hata yakalama
+    console.error('runShiftCheckAndNotify error:', err);
+    return { success: false, error: err.message };
   }
-}, 30000); // Her 30 saniyede bir kontrol et
+}
+
+// Hem Vercel Serverless hem de şirket paneli tarafından tetiklenebilen cron endpoint'i
+app.all('/api/cron/check-shifts', async (req, res) => {
+  const result = await runShiftCheckAndNotify();
+  res.json(result);
+});
+
+// Sürekli çalışan sunucu için yerel interval (20 saniyede bir kontrol)
+setInterval(runShiftCheckAndNotify, 20000);
 
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {

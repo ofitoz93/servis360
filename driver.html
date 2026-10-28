@@ -766,6 +766,19 @@
         </div>
       </div>
 
+      <!-- DİKKAT ÇEKİCİ BİLDİRİM İZNİ UYARI BANNERI -->
+      <div id="bannerRequirePushPerm" style="display: none; background: linear-gradient(135deg, rgba(30, 58, 138, 0.95), rgba(2, 132, 199, 0.95)); border: 2px solid #38bdf8; border-radius: 14px; padding: 1.1rem; color: #fff; box-shadow: 0 6px 20px rgba(2,132,199,0.4);">
+        <div style="font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.3rem;">🔔</span> <span>KİLİTLİ EKRAN SEFER ALARMI İZNİ GEREKLİ</span>
+        </div>
+        <div style="font-size: 0.825rem; margin: 0.6rem 0; line-height: 1.45; color: #e0f2fe;">
+          Telefon ekranınız kapalıyken veya cebinizdeyken sefer saati geldiğinde telefonunuzun titreyip çalabilmesi için lütfen aşağıdaki butona dokunarak bildirim iznini aktif edin.
+        </div>
+        <button type="button" onclick="enablePushNotificationsExplicitly()" style="width: 100%; background: #22c55e; color: #fff; border: none; padding: 0.85rem; border-radius: 10px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(34,197,94,0.4);">
+          <span>🔔</span> <span>BİLDİRİM İZNİNİ AÇ & KİLİTLİ ALARMI AKTİF ET</span>
+        </button>
+      </div>
+
       <!-- 0. Mobil Bildirim & HTTPS Bağlantı Durumu Kartı -->
       <div class="card" id="cardNotifDiagnostic" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(59, 130, 246, 0.35);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -1208,6 +1221,7 @@
       const badge = document.getElementById('badgeNotifPerm');
       const boxHttps = document.getElementById('boxHttpsNotice');
       const linkHttps = document.getElementById('linkSwitchHttps');
+      const bannerPerm = document.getElementById('bannerRequirePushPerm');
       
       const isHttps = location.protocol === 'https:';
       const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -1225,20 +1239,52 @@
           badge.innerText = '🚫 Desteklenmiyor';
           badge.style.color = '#f87171';
         }
+        if (bannerPerm) bannerPerm.style.display = 'none';
         return;
       }
 
-      if (badge) {
-        if (Notification.permission === 'granted') {
+      if (Notification.permission === 'granted') {
+        if (badge) {
           badge.innerText = isSecure ? '🟢 Bildirimler Aktif' : '⚠️ İzin Var (HTTPS Gerekli)';
           badge.style.color = isSecure ? '#34d399' : '#f59e0b';
-        } else if (Notification.permission === 'denied') {
-          badge.innerText = '🔴 Engellendi (İzin Verin)';
+        }
+        if (bannerPerm) bannerPerm.style.display = 'none';
+      } else if (Notification.permission === 'denied') {
+        if (badge) {
+          badge.innerText = '🔴 Engellendi (Site Ayarlarından Açın)';
           badge.style.color = '#f87171';
-        } else {
+        }
+        if (bannerPerm) {
+          bannerPerm.style.display = 'block';
+          const desc = bannerPerm.querySelector('div:nth-child(2)');
+          if (desc) desc.innerText = '⚠️ Bildirim izni tarayıcı tarafından engellenmiş. Lütfen adres çubuğundaki kilit/ayar simgesine dokunup Bildirimler iznini "İzin Ver" yapın.';
+        }
+      } else {
+        // İzin bekleniyor (default)
+        if (badge) {
           badge.innerText = '🟡 İzin Bekliyor';
           badge.style.color = '#fbbf24';
         }
+        if (bannerPerm) bannerPerm.style.display = 'block';
+      }
+    }
+
+    async function enablePushNotificationsExplicitly() {
+      if (!('Notification' in window)) {
+        alert('Bu tarayıcı bildirimleri desteklemiyor.');
+        return;
+      }
+      try {
+        const perm = await Notification.requestPermission();
+        updateNotificationUiStatus();
+        if (perm === 'granted') {
+          await subscribeToWebPush();
+          alert('✅ Harika! Bildirim izni verildi ve telefonunuz kilitli ekran Web Push sistemine kaydedildi.\n\nArtık telefonunuz kapalı olsa bile sefer saati geldiğinde telefonunuz titreyecektir.');
+        } else {
+          alert('⚠️ Bildirim izni verilmedi. Telefon kapalıyken alarm alabilmek için tarayıcınızın adres çubuğundaki kilit simgesine dokunup bildirimlere izin vermelisiniz.');
+        }
+      } catch (err) {
+        alert('İzin hatası: ' + err.message);
       }
     }
 
@@ -1317,17 +1363,28 @@
           }
         }
 
-        if (sub && activeShuttle && activeShuttle.id) {
+        let targetShuttleId = activeShuttle ? activeShuttle.id : null;
+        if (!targetShuttleId) {
+          const savedSession = localStorage.getItem('servis360_driver_session');
+          if (savedSession) {
+            try {
+              const parsed = JSON.parse(savedSession);
+              if (parsed && parsed.shuttle) targetShuttleId = parsed.shuttle.id;
+            } catch (e) {}
+          }
+        }
+
+        if (sub && targetShuttleId) {
           await fetch('/api/push/subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              shuttleId: activeShuttle.id,
+              shuttleId: targetShuttleId,
               subscription: sub.toJSON()
             })
           });
           if (statusEl) {
-            statusEl.innerHTML = '<span style="color:#34d399">🟢 <b>Kilitli Ekran Web Push Hazır:</b> Telefon ekranı kapalı olsa bile 07:15 sefer saati geldiğinde sunucu doğrudan telefonunuzu çaldırır.</span>';
+            statusEl.innerHTML = '<span style="color:#34d399">🟢 <b>Kilitli Ekran Web Push Aktif:</b> Telefon ekranınız kapalı olsa bile sefer saati geldiğinde telefonunuz titreyecektir.</span>';
           }
         } else if (Notification.permission !== 'granted') {
           if (statusEl) {
