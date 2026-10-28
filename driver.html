@@ -852,6 +852,14 @@
       }
 
       if (matchedMode) {
+        // Eğer kullanıcı bu seferi az önce manuel olarak bitirdiyse/durdurduysa aynı pencerede tekrar açma!
+        const scheduledTime = activeShuttle[matchedMode === 'evening' ? 'return_time' : 'shift_start_time'] || 'default';
+        const stopKey = `servis360_trip_stopped_${matchedMode}_${activeShuttle.id}_${scheduledTime}`;
+        if (sessionStorage.getItem(stopKey) === '1') {
+          updateCountdownText(curMin, mornMin, eveMin);
+          return;
+        }
+
         console.log(`⏰ Sefer saati geldi (${currentTimeStr} - ${matchedMode})! Canlı konum otomatik başlatılıyor.`);
         startLiveTracking(matchedMode, true);
       } else {
@@ -998,6 +1006,13 @@
     }
 
     async function finishCurrentTrip() {
+      if (activeShuttle) {
+        const eveTime = activeShuttle.return_time || '11:45';
+        const mornTime = activeShuttle.shift_start_time || '07:15';
+        sessionStorage.setItem(`servis360_trip_stopped_evening_${activeShuttle.id}_${eveTime}`, '1');
+        sessionStorage.setItem(`servis360_trip_stopped_morning_${activeShuttle.id}_${mornTime}`, '1');
+      }
+
       stopLiveTracking();
 
       if (activeShuttle) {
@@ -1066,10 +1081,22 @@
     }
 
     function manualStartTracking() {
+      if (activeShuttle) {
+        const eveTime = activeShuttle.return_time || '11:45';
+        const mornTime = activeShuttle.shift_start_time || '07:15';
+        sessionStorage.removeItem(`servis360_trip_stopped_evening_${activeShuttle.id}_${eveTime}`);
+        sessionStorage.removeItem(`servis360_trip_stopped_morning_${activeShuttle.id}_${mornTime}`);
+      }
       startLiveTracking('evening', false);
     }
 
     function manualStopTracking() {
+      if (activeShuttle) {
+        const eveTime = activeShuttle.return_time || '11:45';
+        const mornTime = activeShuttle.shift_start_time || '07:15';
+        sessionStorage.setItem(`servis360_trip_stopped_evening_${activeShuttle.id}_${eveTime}`, '1');
+        sessionStorage.setItem(`servis360_trip_stopped_morning_${activeShuttle.id}_${mornTime}`, '1');
+      }
       stopLiveTracking();
     }
 

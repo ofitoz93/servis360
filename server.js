@@ -1360,7 +1360,7 @@ async function runShiftCheckAndNotify() {
       if (!matchedMode) continue;
 
       // Eğer araç zaten canlı yayındaysa veya seferi tamamlamışsa bildirim atma
-      if (shuttle.current_status === 'running' || shuttle.current_status === 'arrived') continue;
+      if (shuttle.current_status === 'running' || shuttle.current_status === 'arrived' || shuttle.current_status === 'completed') continue;
 
       const tripLabel = matchedMode === 'evening' ? 'Akşam Dönüş (Dağıtım)' : 'Sabah Toplama';
       const scheduledTimeStr = matchedMode === 'evening' ? shuttle.return_time : shuttle.shift_start_time;
@@ -1386,7 +1386,7 @@ async function runShiftCheckAndNotify() {
               endpoint: sub.endpoint,
               keys: { p256dh: sub.p256dh, auth: sub.auth }
             };
-            await webpush.sendNotification(pushConfig, payload);
+            await webpush.sendNotification(pushConfig, payload, { TTL: 60, urgency: 'high' });
             await pool.query('UPDATE push_subscriptions SET last_notified_at = NOW() WHERE id = $1', [sub.id]);
             sentNotifications.push({ plate: shuttle.plate, mode: matchedMode, subId: sub.id });
             console.log(`📡 [Web Push] ${shuttle.plate} (${tripLabel}) bildirimi başarıyla gönderildi!`);

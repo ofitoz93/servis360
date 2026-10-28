@@ -31,10 +31,11 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Sefer saatiniz geldi. Canlı GPS yayınını başlatmak için dokunun.',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    vibrate: [300, 150, 300, 150, 400],
-    tag: data.tag || 'servis360-trip-alarm',
+    vibrate: [500, 200, 500, 200, 500, 200, 800],
+    tag: data.tag || ('servis360-trip-alarm-' + Date.now()),
     renotify: true,
     requireInteraction: true,
+    silent: false,
     data: {
       url: data.url || '/driver.html',
       trip_mode: data.trip_mode || 'morning',
