@@ -541,6 +541,20 @@
           </div>
         </div>
 
+        <!-- Yanlışlıkla Bitirilen Seferi Tekrar Açma Kutusu -->
+        <div id="boxTripStoppedBanner" style="display: none; background: rgba(37, 99, 235, 0.15); border: 1px solid rgba(59, 130, 246, 0.5); border-radius: 12px; padding: 1rem; text-align: center; margin-top: 0.75rem;">
+          <div style="font-size: 1.6rem; margin-bottom: 0.25rem;">🔄</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #93c5fd;">
+            Sefer Tamamlandı / Durduruldu
+          </div>
+          <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 0.35rem; line-height: 1.4;">
+            Seferi <b>yanlışlıkla bitirdiyseniz</b> veya devam ettirmek istiyorsanız butona basarak bugünün seferini tekrar açabilirsiniz.
+          </div>
+          <button type="button" class="btn-main" onclick="reopenCurrentTrip()" style="margin-top: 0.85rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); font-size: 0.95rem; padding: 0.85rem; font-weight: 700;">
+            ▶️ Seferi Tekrar Aç & Canlı Yayını Başlat
+          </button>
+        </div>
+
         <!-- Canlı Yayın Aktif Kutusu -->
         <div id="boxLiveBroadcasting" class="live-broadcast-box" style="display: none;">
           <div style="font-size: 2rem; margin-bottom: 0.25rem;">📡</div>
@@ -932,6 +946,9 @@
         }
       }
 
+      const banner = document.getElementById('boxTripStoppedBanner');
+      if (banner) banner.style.display = 'none';
+
       updateUiState();
 
       // GPS Yayını
@@ -1020,6 +1037,10 @@
     }
 
     async function finishCurrentTrip() {
+      if (!confirm("⚠️ Sürüşü bitirip canlı konumu kapatmak istediğinize emin misiniz?\n\n(Yanlışlıkla basarsanız ekrandan 'Seferi Tekrar Aç' butonu ile anında devam edebilirsiniz.)")) {
+        return;
+      }
+
       if (activeShuttle) {
         const eveTime = activeShuttle.return_time || '11:45';
         const mornTime = activeShuttle.shift_start_time || '07:15';
@@ -1028,6 +1049,10 @@
       }
 
       stopLiveTracking();
+
+      // Yanlışlıkla bitirmelere karşı "Seferi Tekrar Aç" kutusunu ekranda göster
+      const banner = document.getElementById('boxTripStoppedBanner');
+      if (banner) banner.style.display = 'block';
 
       if (activeShuttle) {
         try {
@@ -1039,7 +1064,42 @@
         } catch (e) {}
       }
 
-      alert('🏁 SÜRÜŞ BİTİRİLDİ!\n\nCanlı GPS yayını kapatıldı ve şirket paneline iletildi.\n\nSistem tekrar nöbet moduna döndü.');
+      sendSystemNotification(
+        `🏁 ${activeShuttle ? activeShuttle.plate : 'Servis'}: Sürüş Bitirildi`,
+        `Canlı konum kapatıldı. Yanlışlıkla bitirdiyseniz ekrandan 'Seferi Tekrar Aç' butonuna basabilirsiniz.`
+      );
+    }
+
+    // Yanlışlıkla Bitirilen Seferi Anında Tekrar Açma & Canlı Yayını Sürdürme
+    async function reopenCurrentTrip() {
+      if (!activeShuttle) return;
+
+      const eveTime = activeShuttle.return_time || '11:45';
+      const mornTime = activeShuttle.shift_start_time || '07:15';
+      sessionStorage.removeItem(`servis360_trip_stopped_evening_${activeShuttle.id}_${eveTime}`);
+      sessionStorage.removeItem(`servis360_trip_stopped_morning_${activeShuttle.id}_${mornTime}`);
+
+      const banner = document.getElementById('boxTripStoppedBanner');
+      if (banner) banner.style.display = 'none';
+
+      const curH = new Date().getHours();
+      const tripMode = curH >= 12 ? 'evening' : 'morning';
+
+      try {
+        await fetch(`/api/shuttle/${activeShuttle.id}/reopen-trip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trip_type: tripMode })
+        });
+      } catch (e) {
+        console.warn('Reopen trip error:', e);
+      }
+
+      startLiveTracking(tripMode, false);
+      sendSystemNotification(
+        `🔄 ${activeShuttle.plate}: Sefer Yeniden Başlatıldı!`,
+        `Canlı GPS koordinatları şirket paneline tekrar aktarılıyor.`
+      );
     }
 
     async function sendSystemNotification(title, body) {

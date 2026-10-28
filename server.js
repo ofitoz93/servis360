@@ -759,6 +759,45 @@ app.post('/api/shuttle/:shuttleId/finish-trip', async (req, res) => {
   }
 });
 
+// Şoförün yanlışlıkla bitirdiği seferi tekrar açması ("Seferi Tekrar Aç" butonu)
+app.post('/api/shuttle/:shuttleId/reopen-trip', async (req, res) => {
+  const { shuttleId } = req.params;
+  const { trip_type } = req.body;
+  try {
+    const updateRes = await pool.query(`
+      UPDATE shuttles 
+      SET current_status = 'running'
+      WHERE id = $1
+      RETURNING *
+    `, [shuttleId]);
+
+    // Bugünün son tamamlanan seferini bul ve tekrar in_progress durumuna çek
+    const lastTripRes = await pool.query(`
+      SELECT * FROM service_trips 
+      WHERE shuttle_id = $1 AND trip_date = CURRENT_DATE
+      ORDER BY id DESC LIMIT 1
+    `, [shuttleId]);
+
+    if (lastTripRes.rows.length > 0 && lastTripRes.rows[0].status === 'completed') {
+      await pool.query(`
+        UPDATE service_trips 
+        SET status = 'in_progress', end_time = NULL, end_reason = NULL
+        WHERE id = $1
+      `, [lastTripRes.rows[0].id]);
+    }
+
+    res.json({
+      success: true,
+      message: 'Sefer başarıyla yeniden açıldı ve canlı takibe alındı.',
+      trip_type: trip_type || 'morning',
+      shuttle: updateRes.rows[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Şoförün canlı konumu durdurması durumunda statü güncelleme
 app.post('/api/shuttle/:shuttleId/status', async (req, res) => {
   const { shuttleId } = req.params;

@@ -5,5 +5,11 @@
       "source": "/api/(.*)",
       "destination": "/api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/check-shifts",
+      "schedule": "15 4 * * *"
+    }
   ]
 }
