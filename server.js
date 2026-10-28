@@ -1270,6 +1270,56 @@ app.post('/api/push/test', async (req, res) => {
   }
 });
 
+// Firma için bildirim izni vermiş aktif cihazlar listesi
+app.get('/api/company/:companyId/push-devices', async (req, res) => {
+  const { companyId } = req.params;
+  try {
+    const r = await pool.query(`
+      SELECT ps.id, ps.shuttle_id, s.plate, s.driver_name, ps.user_agent, 
+             ps.last_notified_at, ps.created_at
+      FROM push_subscriptions ps
+      JOIN shuttles s ON ps.shuttle_id = s.id
+      WHERE s.company_id = $1
+      ORDER BY ps.id DESC
+    `, [parseInt(companyId)]);
+    res.json({ success: true, devices: r.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Şirket sahibinin kokpitten bir şoförün telefonunu anında çaldırması / bildirim göndermesi
+app.post('/api/push/send-to-shuttle/:shuttleId', async (req, res) => {
+  const { shuttleId } = req.params;
+  const { title, body } = req.body;
+  try {
+    const subsRes = await pool.query('SELECT * FROM push_subscriptions WHERE shuttle_id = $1', [parseInt(shuttleId)]);
+    if (subsRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Bu araca ait aktif bildirim izni verilmiş cihaz bulunamadı.' });
+    }
+    const payload = JSON.stringify({
+      title: title || '🔔 Servis360 Bildirimi',
+      body: body || 'Firma yönetimi tarafından gönderildi.',
+      url: '/driver.html'
+    });
+    let sent = 0;
+    for (const sub of subsRes.rows) {
+      try {
+        await webpush.sendNotification({
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth }
+        }, payload);
+        sent++;
+      } catch (e) {
+        console.warn('Push hatası:', e.message);
+      }
+    }
+    res.json({ success: true, message: `${sent} adet cihaza bildirim iletildi.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 4. OTOMATİK SEFER SAATİ ARKA PLAN ZAMANLAYICISI & CRON ENDPOINT'I
 // Türkiye saati (Europe/Istanbul) kullanarak saatleri kontrol eder. Vercel ve local ortamlarda çalışır.
 async function runShiftCheckAndNotify() {
