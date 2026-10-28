@@ -529,7 +529,7 @@ app.post('/api/shuttle/:shuttleId/location', async (req, res) => {
   try {
     const updateRes = await pool.query(`
       UPDATE shuttles 
-      SET last_lat = $1, last_lng = $2, current_status = COALESCE($3, 'running')
+      SET last_lat = $1, last_lng = $2, current_status = COALESCE($3, 'running'), last_location_time = NOW()
       WHERE id = $4
       RETURNING *
     `, [lat, lng, status || 'running', shuttleId]);
@@ -1134,7 +1134,12 @@ app.get('/api/company/:companyId/shuttles/live-locations', async (req, res) => {
     const result = await pool.query(`
       SELECT DISTINCT ON (s.id)
              s.id, s.plate, s.model, s.driver_name, s.driver_phone, 
-             s.shift_start_time, s.return_time, s.current_status, s.last_lat, s.last_lng,
+             s.shift_start_time, s.return_time, 
+             CASE 
+               WHEN s.current_status = 'running' AND (s.last_location_time IS NULL OR s.last_location_time < NOW() - INTERVAL '75 seconds') THEN 'idle'
+               ELSE s.current_status 
+             END as current_status,
+             s.last_lat, s.last_lng, s.last_location_time,
              r.id as route_id, r.route_name
       FROM shuttles s
       LEFT JOIN routes r ON r.shuttle_id = s.id
@@ -1436,17 +1441,26 @@ async function runShiftCheckAndNotify() {
 
       if (!matchedMode) continue;
 
-      // Eğer araç zaten canlı yayındaysa veya seferi tamamlamışsa bildirim atma
-      if (shuttle.current_status === 'running' || shuttle.current_status === 'arrived' || shuttle.current_status === 'completed') continue;
+      // 1. Eğer araç gerçekten son 60 saniyede canlı sinyal gönderiyorsa bildirim atma (şoför zaten uygulamayı açmış)
+      const isActivelyBroadcasting = shuttle.current_status === 'running' && shuttle.last_location_time && (Date.now() - new Date(shuttle.last_location_time).getTime() < 60000);
+      if (isActivelyBroadcasting) continue;
+
+      // 2. Bugünün bu seferi (sabah veya akşam) zaten tamamlanmış mı kontrol et
+      const todayDoneTrip = await pool.query(`
+        SELECT id FROM service_trips 
+        WHERE shuttle_id = $1 AND trip_date = CURRENT_DATE AND trip_type = $2 AND status = 'completed'
+        LIMIT 1
+      `, [shuttle.id, matchedMode]);
+      if (todayDoneTrip.rows.length > 0) continue;
 
       const tripLabel = matchedMode === 'evening' ? 'Akşam Dönüş (Dağıtım)' : 'Sabah Toplama';
       const scheduledTimeStr = matchedMode === 'evening' ? shuttle.return_time : shuttle.shift_start_time;
 
-      // Son 10 dakikada bildirim atılmamış cihazları bul
+      // Son 3 dakikada bildirim atılmamış cihazları bul
       const subsRes = await pool.query(`
         SELECT * FROM push_subscriptions 
         WHERE shuttle_id = $1 
-          AND (last_notified_at IS NULL OR last_notified_at < NOW() - INTERVAL '10 minutes')
+          AND (last_notified_at IS NULL OR last_notified_at < NOW() - INTERVAL '3 minutes')
       `, [shuttle.id]);
 
       if (subsRes.rows.length > 0) {

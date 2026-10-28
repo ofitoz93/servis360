@@ -1306,6 +1306,10 @@ function startRealGpsPolling() {
     if (!state.activeCompanyData || !liveMap) return;
     const compId = state.activeCompanyData.company.id;
     fetchAndRenderLiveShuttles(compId);
+    // Vercel sunucusuz ortamında da vardiya cronunu periyodik tetikle
+    if (Math.random() < 0.15) {
+      fetch('/api/cron/check-shifts').catch(() => {});
+    }
   }, 2500);
 }
 
