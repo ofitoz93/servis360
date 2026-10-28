@@ -569,6 +569,9 @@
               <div class="info-tile-val" id="txtLastSentTime" style="font-size: 0.85rem;">--:--:--</div>
             </div>
           </div>
+          <button type="button" class="btn-main" onclick="finishCurrentTrip()" style="margin-top: 1rem; background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); font-size: 0.95rem; padding: 0.9rem;">
+            🏁 Sürüşü Bitir & Canlı Konumu Kapat
+          </button>
         </div>
       </div>
 
@@ -578,11 +581,14 @@
           Manuel Test Butonları
         </div>
 
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="button" class="btn-main btn-start" id="btnManualStart" onclick="manualStartTracking()" style="flex: 1; padding: 0.75rem; font-size: 0.85rem;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn-main btn-start" id="btnManualStart" onclick="manualStartTracking()" style="flex: 1; min-width: 130px; padding: 0.75rem; font-size: 0.85rem;">
             ▶️ Şimdi Başlat (Test)
           </button>
-          <button type="button" class="btn-main btn-stop" id="btnManualStop" onclick="manualStopTracking()" style="flex: 1; padding: 0.75rem; font-size: 0.85rem;">
+          <button type="button" class="btn-main" onclick="finishCurrentTrip()" style="flex: 1; min-width: 130px; padding: 0.75rem; font-size: 0.85rem; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;">
+            🏁 Sürüşü Bitir
+          </button>
+          <button type="button" class="btn-main btn-stop" id="btnManualStop" onclick="manualStopTracking()" style="padding: 0.75rem 1rem; font-size: 0.85rem;">
             ⏹️ Durdur
           </button>
         </div>
@@ -975,6 +981,22 @@
           body: JSON.stringify({ status: 'idle' })
         }).catch(() => {});
       }
+    }
+
+    async function finishCurrentTrip() {
+      stopLiveTracking();
+
+      if (activeShuttle) {
+        try {
+          await fetch(`/api/shuttle/${activeShuttle.id}/finish-trip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trip_type: 'evening' })
+          });
+        } catch (e) {}
+      }
+
+      alert('🏁 SÜRÜŞ BİTİRİLDİ!\n\nCanlı GPS yayını kapatıldı ve şirket paneline iletildi.\n\nSistem tekrar nöbet moduna döndü.');
     }
 
     function manualStartTracking() {
